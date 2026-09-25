@@ -1,0 +1,25 @@
+{
+  "name": "next-effect-bdd",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Minimal Next.js custom server driven by an Effect pipeline, tested with effect-bdd.",
+  "scripts": {
+    "build": "next build",
+    "start": "node app.ts",
+    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.117",
+    "effect-bdd": "^0.9.3",
+    "next": "^16.3.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.2.0",
+    "tsx": "^4.23.13",
+    "typescript": "7.0.2"
+  }
+}

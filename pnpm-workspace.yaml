@@ -1,0 +1,9 @@
+# Isolate this repo: no ancestor workspace may absorb it.
+packages: []
+
+allowBuilds:
+  # tsx bundles esbuild, which needs its postinstall to unpack the binary.
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - effect-bdd@0.9.3
