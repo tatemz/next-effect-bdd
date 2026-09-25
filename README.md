@@ -46,11 +46,11 @@ Each Gherkin step maps to a stage of the pipeline:
 ## Commands
 
 ```sh
-npm install
+pnpm install
 
-npm run build          # next build (required before start/tests)
-npm start              # http://localhost:3456  (LANGUAGE=es npm start)
-npm run test-bdd       # effect-bdd, en + es scenarios
+pnpm build          # next build (required before start/tests)
+pnpm start              # http://localhost:3456  (LANGUAGE=es pnpm start)
+pnpm test-bdd       # effect-bdd, en + es scenarios
 ```
 
 ## Requirements
