@@ -10,7 +10,12 @@ Feature: Greeting visitors
       | en       | Hello!   |
       | es       | ¡Hola!   |
 
-  Scenario: The health check reports the configured greeter
-    Given a POC app with the es greeter
+  Scenario Outline: The health check reports the configured greeter
+    Given a POC app with the <language> greeter
     When the app is running
-    Then the health check says status ok and greeting ¡Hola!
+    Then the health check says status ok and greeting <expected>
+
+    Examples:
+      | language | expected |
+      | en       | Hello!   |
+      | es       | ¡Hola!   |
