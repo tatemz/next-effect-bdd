@@ -2,16 +2,17 @@ import { NodeRuntime } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import { Greeter } from "./domain/greeter.ts";
-import { AppConfig, appFor } from "./server/app.ts";
+import { ApiAppConfig, apiApp } from "./server/apiApp.ts";
 import { serveApp } from "./server/pipeline.ts";
 
 if (import.meta.main) {
-  // The default entry point: the Next app and the Effect HTTP API composed
-  // on one router. Build from config, then launch until interrupted.
+  // API-only entry point: the typed Api, /docs, and /openapi.json, with no
+  // Next server booted and no page renders. Unmatched routes 404. The API
+  // has no mode: it is the same app serving either way.
   const AppLayer = Layer.unwrap(
     Effect.gen(function* () {
-      const { mode, language, port } = yield* AppConfig;
-      const appWithGreeter = HttpRouter.provideRequest(Greeter.layerFor(language))(appFor(mode));
+      const { language, port } = yield* ApiAppConfig;
+      const appWithGreeter = HttpRouter.provideRequest(Greeter.layerFor(language))(apiApp);
       return serveApp(port)(appWithGreeter);
     }),
   );

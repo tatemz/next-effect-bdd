@@ -6,8 +6,12 @@
   "description": "Minimal Next.js custom server driven by an Effect pipeline, tested with effect-bdd.",
   "scripts": {
     "build": "next build",
-    "dev": "DEV=true PORT=3456 LANGUAGE=en node main.ts",
-    "start": "node main.ts",
+    "dev": "MODE=development PORT=3456 LANGUAGE=en node main.ts",
+    "dev:next": "MODE=development PORT=3456 LANGUAGE=en node main.next.ts",
+    "dev:api": "PORT=3457 LANGUAGE=en node main.api.ts",
+    "start": "MODE=production PORT=3456 LANGUAGE=en node main.ts",
+    "start:next": "MODE=production PORT=3456 LANGUAGE=en node main.next.ts",
+    "start:api": "PORT=3457 LANGUAGE=en node main.api.ts",
     "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose --parallel=2 --strict",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
@@ -20,10 +24,11 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@effect/tsgo": "0.46.1",
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.0",
+    "@vercel/nft": "1.11.0",
     "tsx": "^4.23.13",
-    "typescript": "7.0.2",
-    "@effect/tsgo": "0.46.1"
+    "typescript": "7.0.2"
   }
 }
