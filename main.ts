@@ -10,8 +10,9 @@ if (import.meta.main) {
   const AppLayer = Layer.unwrap(
     Effect.gen(function* () {
       const { language, port } = yield* AppConfig;
-      return createApp({ dev: false })
-        .pipe(HttpRouter.provideRequest(Greeter.layerFor(language)), serveApp(port));
+      const app = createApp({ dev: false });
+      const appWithGreeter = HttpRouter.provideRequest(Greeter.layerFor(language))(app);
+      return serveApp(port)(appWithGreeter);
     }),
   );
   Layer.launch(AppLayer).pipe(NodeRuntime.runMain);
