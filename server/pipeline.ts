@@ -5,9 +5,19 @@ import { NetAddress } from "effect/unstable/net";
 import { createServer } from "node:http";
 
 /**
- * The value flowing through the app pipeline: a layer that registers routes
- * on the HTTP router, plus any route dependencies (as router request markers)
- * still waiting for `HttpRouter.provideRequest`.
+ * The value flowing through the app pipeline.
+ *
+ * A layer that registers routes on the HTTP router, plus any route
+ * dependencies (as router request markers) still waiting for
+ * `HttpRouter.provideRequest`. Compose `HttpRouter.add` and
+ * `HttpRouter.provideRequest` results; `serveApp` / `startApp` terminate it.
+ *
+ * @example
+ * import { HttpRouter } from "effect/unstable/http";
+ * import { createApp } from "./app.ts";
+ * import type { EffectApp } from "./pipeline.ts";
+ *
+ * const app: EffectApp = createApp({ dev: false });
  */
 export type EffectApp<E = never, R = never> = Layer.Layer<
   never,
@@ -16,9 +26,18 @@ export type EffectApp<E = never, R = never> = Layer.Layer<
 >;
 
 /**
- * `serveApp(port)` - the pipeline's Layer terminator: `HttpRouter.serve`
- * over `NodeHttpServer`, the canonical V4 setup. Launch or build the layer
- * to run the app; `0` picks an ephemeral port.
+ * The pipeline's Layer terminator: `HttpRouter.serve` over
+ * `NodeHttpServer`, the canonical V4 setup.
+ *
+ * Launch or build the resulting layer to run the app; `0` picks an
+ * ephemeral port.
+ *
+ * @example
+ * import { Layer } from "effect";
+ * import { createApp } from "./app.ts";
+ * import { serveApp } from "./pipeline.ts";
+ *
+ * Layer.launch(serveApp(3456)(createApp({ dev: false })));
  */
 export const serveApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
   Layer.provideMerge(
@@ -27,9 +46,23 @@ export const serveApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
   );
 
 /**
- * `startApp(port)` - build the served app and return the bound port. The
- * server runs until the surrounding scope closes; `0` picks an ephemeral
- * port, which is how the BDD scenarios get an isolated server per scenario.
+ * Build the served app and return the bound port.
+ *
+ * The server runs until the surrounding scope closes; `0` picks an
+ * ephemeral port, which is how the BDD scenarios get an isolated server per
+ * scenario.
+ *
+ * @example
+ * import { Effect } from "effect";
+ * import { HttpRouter } from "effect/unstable/http";
+ * import { Greeter } from "../domain/greeter.ts";
+ * import { createApp } from "./app.ts";
+ * import { startApp } from "./pipeline.ts";
+ *
+ * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(
+ *   createApp({ dev: false }),
+ * );
+ * const port = yield* Effect.scoped(startApp(0)(app)); // e.g. 54321
  */
 export const startApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
   Effect.gen(function* () {
