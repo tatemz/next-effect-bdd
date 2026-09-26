@@ -7,7 +7,8 @@
   "scripts": {
     "build": "next build",
     "start": "node main.ts",
-    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose"
+    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose",
+    "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-rc.117",
@@ -21,6 +22,7 @@
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.0",
     "tsx": "^4.23.13",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@effect/tsgo": "0.46.1"
   }
 }
