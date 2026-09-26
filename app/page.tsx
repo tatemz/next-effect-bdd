@@ -15,7 +15,8 @@ const View = (model: typeof ViewModel.Encoded) => <main id="message">{model.mess
 const controller = Effect.gen(function* () {
   const greeter = yield* Greeter;
   const message = yield* greeter.greet();
-  return yield* ViewModel.makeEffect({ message });
+  const model = yield* ViewModel.makeEffect({ message });
+  return model
 });
 
 const page = Effect.map(controller, View);

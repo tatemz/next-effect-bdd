@@ -23,9 +23,7 @@ interface AppRunning {
 export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
   Bdd.scenario("The home page greets in the chosen language").pipe(
     Bdd.given`a POC app with the ${language} greeter`(
-      Effect.fn("Greeting.appWithGreeter")(function* ({ language }: {
-        readonly language: Language;
-      }) {
+      Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
         return { app: createApp({ dev: false }), greeter: Greeter.layerFor(language) };
       }),
     ),
@@ -36,10 +34,7 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
       }),
     ),
     Bdd.then`the home page says ${expected}`(
-      Effect.fn("Greeting.homePageSays")(function* (
-        { expected }: { readonly expected: string },
-        url: string,
-      ) {
+      Effect.fn("Greeting.homePageSays")(function* ({ expected }, url: string) {
         const body = yield* Effect.promise(() => fetch(url).then((response) => response.text()));
         if (!body.includes(`<main id="message">${expected}</main>`)) {
           return yield* Effect.fail(`home page at ${url} did not say ${expected}`);
@@ -50,9 +45,7 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
   ),
   Bdd.scenario("The health check reports the configured greeter").pipe(
     Bdd.given`a POC app with the ${language} greeter`(
-      Effect.fn("Greeting.appWithGreeter")(function* ({ language }: {
-        readonly language: Language;
-      }) {
+      Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
         return { app: createApp({ dev: false }), greeter: Greeter.layerFor(language) };
       }),
     ),
@@ -63,10 +56,7 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
       }),
     ),
     Bdd.then`the health check says status ${status} and greeting ${greeting}`(
-      Effect.fn("Greeting.healthCheckSays")(function* (
-        { greeting, status }: { readonly greeting: string; readonly status: string },
-        url: string,
-      ) {
+      Effect.fn("Greeting.healthCheckSays")(function* ({ greeting, status }, url: string) {
         const json = yield* Effect.tryPromise({
           try: () => fetch(`${url}/health`).then((response) => response.json() as unknown),
           catch: (cause) => `health check fetch failed: ${cause}`,
