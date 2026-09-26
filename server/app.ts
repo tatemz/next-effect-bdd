@@ -14,10 +14,9 @@ const HealthResponse = Schema.Struct({
  */
 const healthRoute = Effect.fn("App.healthRoute")(function* () {
   const greeter = yield* Greeter;
-  const greeting = yield* greeter.greet()
   return yield* HttpServerResponse.schemaJson(HealthResponse)({
     status: "ok",
-    greeting,
+    greeting: yield* greeter.greet,
   });
 });
 

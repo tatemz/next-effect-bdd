@@ -1,5 +1,5 @@
 import { NodeHttpServerRequest } from "@effect/platform-node";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import Next from "next";
 import type { ServerResponse } from "node:http";
@@ -10,6 +10,12 @@ import { type AppDeps, runInRenderContext } from "./deps.ts";
 type NextFactory = (typeof import("next/dist/server/next.js"))["default"];
 type NextServer = ReturnType<NextFactory>;
 export type NextOptions = Parameters<NextFactory>[0];
+
+/** A Next.js promise rejected at one of its lifecycle stages. */
+export class NextJsError extends Schema.TaggedError<NextJsError>()("NextJsError", {
+  stage: Schema.Literals(["prepare", "render"]),
+  cause: Schema.Defect(),
+}) {}
 
 /**
  * The Next.js side of the app as a service: one prepared Next server that
@@ -26,7 +32,7 @@ export class NextJs extends Context.Service<
   {
     readonly render: (
       request: HttpServerRequest.HttpServerRequest,
-    ) => Effect.Effect<HttpServerResponse.HttpServerResponse, unknown>;
+    ) => Effect.Effect<HttpServerResponse.HttpServerResponse, NextJsError>;
   }
 >()("NextJs") {
   static readonly layer = (options: NextOptions) =>
@@ -39,7 +45,10 @@ export class NextJs extends Context.Service<
             Effect.ignore,
           ),
         );
-        yield* Effect.tryPromise({ try: () => next.prepare(), catch: (cause) => cause });
+        yield* Effect.tryPromise({
+          try: () => next.prepare(),
+          catch: (cause) => new NextJsError({ stage: "prepare", cause }),
+        });
         const handler = next.getRequestHandler();
         return NextJs.of({
           render: Effect.fnUntraced(function* (request: HttpServerRequest.HttpServerRequest) {
@@ -51,7 +60,7 @@ export class NextJs extends Context.Service<
             const context = (yield* Effect.context<never>()) as Context.Context<AppDeps>;
             yield* Effect.tryPromise({
               try: () => runInRenderContext(context, () => handler(req, res)),
-              catch: (cause) => cause,
+              catch: (cause) => new NextJsError({ stage: "render", cause }),
             });
             // Next owns this response: wait for it to finish so the server
             // writer's `writableEnded` check skips the sentinel below.
