@@ -1,0 +1,23 @@
+# Allow only build inputs; exclude local state, credentials and test tooling.
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.json
+!next-env.d.ts
+!next.config.*
+!main.ts
+!app/
+!app/**
+!domain/
+!domain/**
+!server/
+!server/**
+!public/
+!public/**
+!scripts/
+!scripts/package-runtime.mjs
+**/.env*
+**/*.pem
+**/*.key
+**/node_modules
