@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { currentContext } from "../deps.ts";
 import { Greeter } from "../greeter.ts";
 
@@ -6,9 +6,20 @@ import { Greeter } from "../greeter.ts";
 // nothing to prerender at build time.
 export const dynamic = "force-dynamic";
 
+const ViewModel = Schema.TaggedStruct("Main", {
+  message: Schema.NonEmptyString,
+});
+
+const View = (model: typeof ViewModel.Encoded) => <main id="message">{model.message}</main>;
+
+const controller = Effect.gen(function* () {
+  const greeter = yield* Greeter;
+  const message = yield* greeter.greet();
+  return yield* ViewModel.makeEffect({ message });
+});
+
+const page = Effect.map(controller, View);
+
 export default async function HomePage() {
-  const greeting = await Effect.runPromiseWith(currentContext())(
-    Greeter.use((greeter) => greeter.greet()),
-  );
-  return <main id="message">{greeting}</main>;
+  return await Effect.runPromiseWith(currentContext())(page);
 }

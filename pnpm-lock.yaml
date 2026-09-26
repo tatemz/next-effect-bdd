@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@effect/platform-node':
+        specifier: 4.0.0-rc.117
+        version: 4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1)
       effect:
         specifier: 4.0.0-rc.117
         version: 4.0.0-rc.117

@@ -10,6 +10,7 @@
     "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose"
   },
   "dependencies": {
+    "@effect/platform-node": "4.0.0-rc.117",
     "effect": "4.0.0-rc.117",
     "effect-bdd": "^0.9.3",
     "next": "^16.3.6",
