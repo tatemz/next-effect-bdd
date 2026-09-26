@@ -68,7 +68,8 @@ once per app.
 pnpm install
 
 pnpm build          # next build (required before start/tests)
-pnpm start          # http://localhost:3456  (LANGUAGE=es pnpm start)
+pnpm start          # nothing is defaulted: PORT and LANGUAGE are required,
+                    # e.g. PORT=3456 LANGUAGE=en pnpm start
 pnpm test-bdd       # effect-bdd: greeting feature (page outline + health check)
 ```
 
