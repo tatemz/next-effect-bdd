@@ -39,31 +39,28 @@ Components receive the same context through an `AsyncLocalStorage` bridge.
 | `greeter.ts`                | `Greeter` service, the `Language` union, and `Greeter.layerFor`          |
 | `deps.ts`                   | `AsyncLocalStorage` bridge from request fibers into page renders        |
 | `app/page.tsx`              | Server component that runs `Greeter` against the request context        |
-| `features/homepage.feature` | BDD feature: greeter language flows through the pipeline                |
-| `features/health.feature`   | BDD feature: `/health` and the page share one greeter instance          |
-| `features/*.steps.ts`       | Inline step chains; the scenario state *is* the pipeline                |
+| `features/greeting.feature` | BDD feature: narrow scenarios for the page and the health check   |
+| `features/greeting.steps.ts`| Inline step chains; the scenario state *is* the pipeline           |
 
 ## The features
 
 ```gherkin
-Scenario Outline: Greeting visitors
-  Given the app is ready to start
-  Given the greeter is in <language>
+Scenario Outline: The home page greets in the chosen language
+  Given a POC app with the <language> greeter
   When the app is running
   Then the home page says <expected>
+
+Scenario: The health check reports the configured greeter
+  Given a POC app with the es greeter
+  When the app is running
+  Then the health check says status ok and greeting ¡Hola!
 ```
 
-```gherkin
-Scenario: The health endpoint greets with the app's greeter
-  Given a POC app with a counting greeter
-  When the app starts listening
-  Then the health check says status ok and greeting Hello #1!
-  And the home page says Hello #2!
-```
-
-The health scenario uses a `Greeter` that counts greetings in a `Ref`: the
-route must see `Hello #1!` and the page `Hello #2!`, which proves the Effect
-endpoint and the Next page render through the *same* service instance.
+Each scenario makes one narrow claim about one surface: the outline covers
+the Next-rendered HTML page per language, the single scenario covers the
+Effect health route. Both run the full pipeline, so the health check also
+proves the page and the route resolve the *same* `Greeter` instance built
+once per app.
 
 ## Commands
 
@@ -72,7 +69,7 @@ pnpm install
 
 pnpm build          # next build (required before start/tests)
 pnpm start          # http://localhost:3456  (LANGUAGE=es pnpm start)
-pnpm test-bdd       # effect-bdd: homepage outline (en/es) + health scenario
+pnpm test-bdd       # effect-bdd: greeting feature (page outline + health check)
 ```
 
 ## Requirements
