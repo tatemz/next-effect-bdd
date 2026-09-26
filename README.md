@@ -19,6 +19,11 @@ Node req/res, and the services built by `provideRequest` are shared by both
 worlds — Effect routes use them as ordinary services, and React Server
 Components receive the same context through an `AsyncLocalStorage` bridge.
 
+In dev mode (`DEV=true`) two extra routes claim Next's HMR upgrade paths on
+the same router: the platform's `upgrade` listener runs the router for
+socket requests, so those routes hand the raw socket to Next's upgrade
+handler and live refresh works through the Effect server unchanged.
+
 ## The pieces
 
 | Piece                                | Role                                                              |
@@ -73,8 +78,10 @@ and the route resolve the *same* `Greeter` instance built once per app.
 pnpm install
 
 pnpm build          # next build (required before start/tests)
-pnpm start          # nothing is defaulted: PORT and LANGUAGE are required,
-                    # e.g. PORT=3456 LANGUAGE=en pnpm start
+pnpm dev            # dev mode with live refresh (HMR): runs main.ts with
+                    # DEV=true PORT=3456 LANGUAGE=en, no build required
+pnpm start          # nothing is defaulted: PORT, LANGUAGE, and DEV are required,
+                    # e.g. PORT=3456 LANGUAGE=en DEV=false pnpm start
 pnpm test-bdd       # effect-bdd: greeting feature (page outline + health check)
 ```
 
@@ -83,3 +90,5 @@ pnpm test-bdd       # effect-bdd: greeting feature (page outline + health check)
 - Node ≥ 22.12 (native TS stripping runs `main.ts` directly)
 - `effect@4.0.0-rc.117` + `@effect/platform-node@4.0.0-rc.117` —
   `effect-bdd` tracks the v4 release-candidate train
+- `typescript@7` (native compiler) + `@effect/tsgo` — `pnpm exec tsc --noEmit`
+  also reports Effect-specific diagnostics from the language service

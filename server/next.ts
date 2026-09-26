@@ -2,7 +2,8 @@ import { NodeHttpServerRequest } from "@effect/platform-node";
 import { Context, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import Next from "next";
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Duplex } from "node:stream";
 import { type AppDeps, runInRenderContext } from "./deps.ts";
 
 // Next's CJS entry types `import Next from "next"` as a namespace, so bind the
@@ -13,7 +14,7 @@ export type NextOptions = Parameters<NextFactory>[0];
 
 /** A Next.js promise rejected at one of its lifecycle stages. */
 export class NextJsError extends Schema.TaggedError<NextJsError>()("NextJsError", {
-  stage: Schema.Literals(["prepare", "render"]),
+  stage: Schema.Literals(["prepare", "render", "upgrade"]),
   cause: Schema.Defect(),
 }) {}
 
@@ -33,6 +34,15 @@ export class NextJs extends Context.Service<
     readonly render: (
       request: HttpServerRequest.HttpServerRequest,
     ) => Effect.Effect<HttpServerResponse.HttpServerResponse, NextJsError>;
+    /**
+     * Hands a raw upgrade request (Next's dev-mode HMR socket) to Next. Only
+     * meaningful when `dev` is enabled; production Next ignores upgrades.
+     */
+    readonly upgrade: (
+      request: IncomingMessage,
+      socket: Duplex,
+      head: Buffer,
+    ) => Effect.Effect<void, NextJsError>;
   }
 >()("NextJs") {
   static readonly layer = (options: NextOptions) =>
@@ -50,6 +60,7 @@ export class NextJs extends Context.Service<
           catch: (cause) => new NextJsError({ stage: "prepare", cause }),
         });
         const handler = next.getRequestHandler();
+        const upgradeHandler = next.getUpgradeHandler();
         return NextJs.of({
           render: Effect.fnUntraced(function* (request: HttpServerRequest.HttpServerRequest) {
             const req = NodeHttpServerRequest.toIncomingMessage(request);
@@ -67,6 +78,11 @@ export class NextJs extends Context.Service<
             yield* awaitFinished(res);
             return HttpServerResponse.empty({ status: res.statusCode });
           }),
+          upgrade: (request, socket, head) =>
+            Effect.tryPromise({
+              try: () => upgradeHandler(request, socket, head),
+              catch: (cause) => new NextJsError({ stage: "upgrade", cause }),
+            }),
         });
       }),
     );

@@ -9,8 +9,8 @@ if (import.meta.main) {
   // Build the app from its configuration, then launch it until interrupted.
   const AppLayer = Layer.unwrap(
     Effect.gen(function* () {
-      const { language, port } = yield* AppConfig;
-      const app = createApp({ dev: false });
+      const { dev, language, port } = yield* AppConfig;
+      const app = createApp({ dev });
       const appWithGreeter = HttpRouter.provideRequest(Greeter.layerFor(language))(app);
       return serveApp(port)(appWithGreeter);
     }),
