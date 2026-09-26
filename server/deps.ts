@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Context } from "effect";
-import type { Greeter } from "./greeter.ts";
+import type { Greeter } from "../domain/greeter.ts";
 
 /** The services the running app injects into every page render. */
 export type AppDeps = Greeter;

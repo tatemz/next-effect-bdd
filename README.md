@@ -31,16 +31,22 @@ Components receive the same context through an `AsyncLocalStorage` bridge.
 
 ## Layout
 
-| File                        | Role                                                                    |
-| --------------------------- | ------------------------------------------------------------------------ |
-| `server.ts`                 | `EffectApp` type + `serveApp` / `startApp` (`HttpRouter.serve` over `NodeHttpServer`) |
-| `next.ts`                   | `NextJs` service, its live `NextJs.layer`, and the `nextCatchAll` route  |
-| `app.ts`                    | POC composition (health route + Next) + `node app.ts` entry              |
-| `greeter.ts`                | `Greeter` service, the `Language` union, and `Greeter.layerFor`          |
-| `deps.ts`                   | `AsyncLocalStorage` bridge from request fibers into page renders        |
-| `app/page.tsx`              | Server component that runs `Greeter` against the request context        |
-| `features/greeting.feature` | BDD feature: narrow scenarios for the page and the health check   |
-| `features/greeting.steps.ts`| Inline step chains; the scenario state *is* the pipeline           |
+Boundaries follow the Effect repo's `domain` / `server` separation (see its
+ai-docs fixtures): domain models know nothing about HTTP, server code owns
+infrastructure, and `app/` is Next's routing surface.
+
+```text
+domain/greeter.ts      Greeter service, the Language union, Greeter.layerFor
+server/deps.ts         AsyncLocalStorage bridge from request fibers into page renders
+server/next.ts         NextJs service, its live NextJs.layer, and the nextCatchAll route
+server/pipeline.ts     EffectApp type + serveApp / startApp (HttpRouter.serve over NodeHttpServer)
+server/app.ts          POC composition: health route + Next catch-all + AppConfig
+main.ts                entry point: read config, build layers, Layer.launch
+app/page.tsx           Next server component; runs Greeter against the request context
+features/              greeting feature: narrow outlines, one per surface
+```
+
+Dependencies point one way: `app/` and `features/` -> `server/` -> `domain/`.
 
 ## The features
 
@@ -50,17 +56,16 @@ Scenario Outline: The home page greets in the chosen language
   When the app is running
   Then the home page says <expected>
 
-Scenario: The health check reports the configured greeter
-  Given a POC app with the es greeter
+Scenario Outline: The health check reports the configured greeter
+  Given a POC app with the <language> greeter
   When the app is running
-  Then the health check says status ok and greeting ¡Hola!
+  Then the health check says status ok and greeting <expected>
 ```
 
-Each scenario makes one narrow claim about one surface: the outline covers
-the Next-rendered HTML page per language, the single scenario covers the
-Effect health route. Both run the full pipeline, so the health check also
-proves the page and the route resolve the *same* `Greeter` instance built
-once per app.
+Each scenario makes one narrow claim about one surface: one outline covers
+the Next-rendered HTML page per language, the other covers the Effect health
+route. Both run the full pipeline, so the health check also proves the page
+and the route resolve the *same* `Greeter` instance built once per app.
 
 ## Commands
 
@@ -75,6 +80,6 @@ pnpm test-bdd       # effect-bdd: greeting feature (page outline + health check)
 
 ## Requirements
 
-- Node ≥ 22.12 (native TS stripping runs `app.ts` directly)
+- Node ≥ 22.12 (native TS stripping runs `main.ts` directly)
 - `effect@4.0.0-rc.117` + `@effect/platform-node@4.0.0-rc.117` —
   `effect-bdd` tracks the v4 release-candidate train

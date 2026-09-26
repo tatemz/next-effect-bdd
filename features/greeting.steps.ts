@@ -1,9 +1,9 @@
 import { Bdd } from "effect-bdd";
 import { Effect, Layer, Schema } from "effect";
 import { HttpRouter } from "effect/unstable/http";
-import { createApp } from "../app.ts";
-import { Greeter, Language } from "../greeter.ts";
-import { startApp } from "../server.ts";
+import { Greeter, Language } from "../domain/greeter.ts";
+import { createApp } from "../server/app.ts";
+import { startApp } from "../server/pipeline.ts";
 
 const language = Bdd.capture("language", Language);
 const status = Bdd.capture("status", Schema.String);

@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
-import { currentContext } from "../deps.ts";
-import { Greeter } from "../greeter.ts";
+import { Greeter } from "../domain/greeter.ts";
+import { currentContext } from "../server/deps.ts";
 
 // Rendering reads the per-request context from the pipeline, so there is
 // nothing to prerender at build time.

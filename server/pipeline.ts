@@ -32,14 +32,11 @@ export const serveApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
  * port, which is how the BDD scenarios get an isolated server per scenario.
  */
 export const startApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
-  Effect.flatMap(Layer.build(serveApp(port)(self)), boundPort);
-
-const boundPort = Effect.fnUntraced(function* (
-  context: Context.Context<HttpServer.HttpServer>,
-) {
-  const address = Context.get(context, HttpServer.HttpServer).address;
-  if (NetAddress.isInetAddress(address)) {
-    return address.port;
-  }
-  return yield* Effect.die(`startApp expects an inet address, got ${address._tag}`);
-});
+  Effect.gen(function* () {
+    const context = yield* Layer.build(serveApp(port)(self));
+    const address = Context.get(context, HttpServer.HttpServer).address;
+    if (NetAddress.isInetAddress(address)) {
+      return address.port;
+    }
+    return yield* Effect.die(`startApp expects an inet address, got ${address._tag}`);
+  });

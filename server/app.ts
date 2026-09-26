@@ -1,9 +1,7 @@
-import { NodeRuntime } from "@effect/platform-node";
 import { Config, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
-import { Greeter, Language } from "./greeter.ts";
+import { Greeter, Language } from "../domain/greeter.ts";
 import { NextJs, nextCatchAll, type NextOptions } from "./next.ts";
-import { serveApp } from "./server.ts";
 
 const HealthResponse = Schema.Struct({
   status: Schema.tag("ok"),
@@ -40,13 +38,3 @@ export const AppConfig = Config.all({
   port: Config.Port("PORT"),
   language: Config.schema(Language, "LANGUAGE"),
 });
-
-if (import.meta.main) {
-  // Build the app from its configuration, then launch it until interrupted.
-  const AppLayer = Layer.unwrap(
-    Effect.map(AppConfig, ({ language, port }) =>
-      createApp({ dev: false })
-        .pipe(HttpRouter.provideRequest(Greeter.layerFor(language)), serveApp(port))),
-  );
-  Layer.launch(AppLayer).pipe(NodeRuntime.runMain);
-}

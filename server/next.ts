@@ -71,8 +71,10 @@ export class NextJs extends Context.Service<
 export const nextCatchAll = HttpRouter.add(
   "*",
   "*",
-  (request: HttpServerRequest.HttpServerRequest) =>
-    Effect.flatMap(NextJs, (next) => next.render(request)),
+  Effect.fnUntraced(function* (request: HttpServerRequest.HttpServerRequest) {
+    const next = yield* NextJs;
+    return yield* next.render(request);
+  }),
 );
 
 /** Waits until the Node response has finished (or the connection closed). */
