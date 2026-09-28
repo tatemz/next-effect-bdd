@@ -38,5 +38,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Install Playwright browsers
+        # The reveal scenario launches headless Chromium; the binary is not
+        # part of pnpm install (see README).
+        run: pnpm exec playwright install chromium
+
       - name: BDD tests
         run: pnpm test-bdd
