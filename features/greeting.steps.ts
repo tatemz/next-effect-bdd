@@ -1,5 +1,5 @@
 import { Bdd } from "effect-bdd";
-import { Context, Duration, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { chromium, type Page } from "playwright";
 // The steps touch `document` only through `page.waitForFunction`, which
 // serializes the function to the browser; tsconfig's "dom" lib types it.
@@ -96,9 +96,6 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
     ),
     Bdd.then`the home page says ${expected}`(
       Effect.fn("Greeting.homePageSays")(function* ({ expected }, state) {
-        // Artificial delay to test parallelization.
-        yield* Effect.sleep(Duration.seconds(3));
-
         const body = yield* HttpClient.get(`${state.url}/`).pipe(
           Effect.flatMap(HttpClientResponse.filterStatusOk),
           Effect.flatMap((response) => response.text),
@@ -146,8 +143,6 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
     ),
     Bdd.then`the health check says status ${status} and greeting ${greeting}`(
       Effect.fn("Greeting.healthCheckSays")(function* ({ greeting, status }, state) {
-        // Artificial delay to test parallelization.
-        yield* Effect.sleep(Duration.seconds(3));
         // Fully typed: `health()` takes no arguments and resolves to the
         // server's `HealthResponse`, so a wrong field or status tag would be
         // a compile error, and a wrong wire shape a Schema error.

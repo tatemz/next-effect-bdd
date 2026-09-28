@@ -13,7 +13,7 @@
     "start": "MODE=production PORT=3456 LANGUAGE=en node main.ts",
     "start:next": "MODE=production PORT=3456 LANGUAGE=en node main.next.ts",
     "start:api": "PORT=3457 LANGUAGE=en node main.api.ts",
-    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose --parallel=1 --strict",
+    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose --parallel=2 --strict",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
   "dependencies": {
