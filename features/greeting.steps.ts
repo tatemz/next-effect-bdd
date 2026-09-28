@@ -1,5 +1,5 @@
 import { Bdd } from "effect-bdd";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { chromium, type Page } from "playwright";
 // The steps touch `document` only through `page.waitForFunction`, which
 // serializes the function to the browser; tsconfig's "dom" lib types it.
@@ -13,18 +13,34 @@ import { HttpApiClient } from "effect/unstable/httpapi";
 import { Greeter, Language } from "../domain/greeter.ts";
 import { Incrementer } from "../domain/incrementer.ts";
 import { Api } from "../server/api.ts";
-import { appProduction } from "../server/app.ts";
+import { appFor } from "../server/app.ts";
+import { Mode } from "../server/nextApp.ts";
 import { startApp } from "../server/pipeline.ts";
 
 /**
- * Captures a language name from a step, validated by the `Language` schema.
+ * Captures a mode name from a step, validated by the app's own `Mode` union.
  *
- * A step like `a POC app with the es greeter` binds `language` to `"es"`;
- * any other language fails the step at parse time, not deeper in the run.
+ * A step like `a POC app in production mode ...` binds `mode` to
+ * `"production"`; any other string fails the step at parse time, and because
+ * this is the same `Mode` the entry points read from the environment, the
+ * scenarios can never drift onto a mode the app does not serve.
  *
  * @example
- * // Matches: "a POC app with the en greeter" -> { language: "en" }
- * // Bdd.given`a POC app with the ${language} greeter`(step);
+ * // Matches: "a POC app in development mode with the en greeter"
+ * // -> { mode: "development" }
+ * // Bdd.given`a POC app in ${mode} mode with the ${language} greeter`(step);
+ */
+const mode = Bdd.capture("mode", Mode);
+/**
+ * Captures a language name from a step, validated by the `Language` schema.
+ *
+ * A step like `a POC app in production mode with the es greeter` binds
+ * `language` to `"es"`; any other language fails the step at parse time, not
+ * deeper in the run.
+ *
+ * @example
+ * // Matches: "... with the en greeter" -> { language: "en" }
+ * // Bdd.given`a POC app in ${mode} mode with the ${language} greeter`(step);
  */
 const language = Bdd.capture("language", Language);
 /**
@@ -82,102 +98,158 @@ const attempt = <A>(label: string, f: () => Promise<A>) =>
   });
 
 /**
- * A headless browser for one scenario.
- *
- * Mirrors the `BrowserPage` pattern from the effect-bdd docs: the browser is
- * acquired when the scenario's provider layer builds and closed when the
- * scenario's scope closes, so a crashed or hung page cannot leak a Chromium
- * process into the next scenario.
+ * The greeter a scenario composes: the chosen `Greeter` merged with the
+ * `greeting-count` `Incrementer` page renders read.
  *
  * @example
- * // Inside a browser-driving step, the file's own `Browser` service:
- * const browser = yield* Browser;
- * const page = yield* browser.newPage; // fresh tab for this scenario
+ * const greeter = greeterFor("en"); // Greeter + Incrementer, ready to provide
  */
-class Browser extends Context.Service<
-  Browser,
-  {
-    /**
-     * A fresh page in this scenario's browser.
-     *
-     * Opens a new tab; the owning scenario's scope closes the whole browser,
-     * so callers do not close pages individually.
-     *
-     * @example
-     * const browser = yield* Browser;
-     * const page = yield* browser.newPage;
-     */
-    readonly newPage: Effect.Effect<Page, string>;
-  }
->()("Browser") {}
+const greeterFor = (language: Language) =>
+  Layer.provideMerge(
+    Greeter.layerFor(language),
+    Incrementer.greetingCountLayer,
+  );
 
 /**
- * Provides the scenario's `Browser`, launching Chromium when the scenario's
- * layer builds and closing it when its scope closes.
+ * The scenario state the shared setup steps produce (and the shared `When`
+ * consumes): the composed app for the chosen mode, plus the greeter to
+ * provide it once the language step has run.
+ *
+ * Shared steps live outside the scenario pipes, so they carry no contextual
+ * state type; these are those types, written once here instead of repeated
+ * per scenario. `AppMode` is the state after the mode `Given`; `AppSetup`
+ * adds the greeter the language `And` contributes.
  *
  * @example
- * // Wired into the scenarios that drive a real browser (same file):
- * // Bdd.provide(Layer.mergeAll(FetchHttpClient.layer, browserLayer));
+ * // After "a POC app in production mode": AppMode.
+ * // After "the app is using the en greeter": AppSetup.
  */
-const browserLayer = Layer.effect(
-  Browser,
-  Effect.gen(function* () {
-    const chromiumBrowser = yield* attempt("launch chromium", () =>
-      chromium.launch(),
-    );
-    yield* Effect.addFinalizer(() =>
-      Effect.tryPromise(() => chromiumBrowser.close()).pipe(Effect.ignore),
-    );
-    return Browser.of({
-      newPage: attempt("open a page", () => chromiumBrowser.newPage()),
-    });
+type AppMode = {
+  readonly mode: Mode;
+  readonly app: ReturnType<typeof appFor>;
+};
+type AppSetup = AppMode & {
+  readonly greeter: ReturnType<typeof greeterFor>;
+};
+
+/**
+ * The shared first `Given`: the real app composed for the captured mode.
+ *
+ * A setup step states one concern: which runtime the app runs in. `appFor`
+ * is the same total mapping the entry points use: `production` serves the
+ * built `.next` output (fast, but requires `pnpm build` beforehand), while
+ * `development` boots Next with on-demand compilation and HMR (slow, but no
+ * build needed).
+ *
+ * @example
+ * // "a POC app in production mode" -> { mode: "production", app: ... }
+ */
+const givenAppInMode = Bdd.given`a POC app in ${mode} mode`(
+  Effect.fn("Greeting.appInMode")(function* ({ mode }: { readonly mode: Mode }) {
+    return { mode, app: appFor(mode) };
   }),
 );
 
 /**
- * The app's Gherkin feature: the scenarios that pin the POC's observable
- * behavior end to end.
+ * The shared second setup `And`: the greeter the app serves.
  *
- * Each scenario builds the real app (`appProduction` with the chosen
- * `Greeter`), starts it on an ephemeral port via `startApp(0)`, and asserts
- * over HTTP, the typed `Api` client, or a real Chromium page. Scenarios are
- * independent: every one gets its own app, counter, and (where used) browser.
+ * The other setup concern, kept separate from the mode: each scenario gets
+ * its own fresh `Greeter` merged with the `greeting-count` `Incrementer`
+ * that page renders read.
  *
  * @example
- * // Run the whole feature from the terminal:
+ * // "the app is using the es greeter" -> state gains { greeter }
+ */
+const givenGreeterForLanguage = Bdd.given`the app is using the ${language} greeter`(
+  Effect.fn("Greeting.appWithGreeter")(
+    function* ({ language }: { readonly language: Language }, state: AppMode) {
+      return { ...state, greeter: greeterFor(language) };
+    },
+  ),
+);
+
+/**
+ * The shared `When`: start the scenario's app on an ephemeral port.
+ *
+ * `startApp(0)` binds a free port per scenario, so dev and prod examples
+ * run concurrently without fighting over a port; the server lives until the
+ * scenario's scope closes.
+ *
+ * @example
+ * // After the Given, the state gains { url, api } for the later steps.
+ */
+const whenAppIsRunning = Bdd.when`the app is running`(
+  Effect.fn("Greeting.appIsRunning")(function* (state: AppSetup) {
+    const port = yield* state.app.pipe(
+      HttpRouter.provideRequest(state.greeter),
+      startApp(0),
+    );
+
+    const url = `http://localhost:${port}`;
+    const api = yield* HttpApiClient.make(Api, { baseUrl: url });
+
+    return {
+      ...state,
+      url,
+      api,
+    };
+  }),
+);
+
+/**
+ * Keeps a Playwright page hydrating against a dev-mode Next server.
+ *
+ * Turbopack compiles client chunks on demand: a fresh server can answer the
+ * page's own request before the chunks the rendered HTML references exist,
+ * so the browser gets `404`s for them and — never retrying a failed script
+ * fetch — never hydrates. This route intercepts `/_next/static/*` fetches
+ * and re-dials upstream until the compile lands, so hydration waits for the
+ * compile instead of dying on it. It is a no-op passthrough in production,
+ * where the chunks are already built.
+ *
+ * @example
+ * // In the browser step, before the first goto:
+ * yield* attempt("route the page's static chunks", () =>
+ *   retryStaticChunks(page),
+ * );
+ */
+const retryStaticChunks = (page: Page) =>
+  page.route("**/_next/static/**", async (route) => {
+    // Turbopack dev compiles a page's chunks in well under a second once
+    // the page request started the compile; two seconds is generous, and a
+    // genuinely missing chunk still fails as a real 404 afterwards.
+    for (let attemptNo = 0; attemptNo < 20; attemptNo += 1) {
+      const response = await route.fetch({ timeout: 2000 }).catch(() => null);
+      if (response !== null && response.status() < 400) {
+        return route.fulfill({ response });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    // Give up retrying and pass one real request through, so the browser
+    // reports the true failure (a chunk that never exists, a dead server).
+    return route.continue();
+  });
+
+/**
+ * The app's Gherkin feature: the scenarios that pin the POC's observable
+ * behavior end to end, once per mode.
+ *
+ * Each scenario builds the real app for its example's mode (`appFor(mode)`
+ * with the chosen `Greeter`), starts it on an ephemeral port via
+ * `startApp(0)`, and asserts over HTTP, the typed `Api` client, or a real
+ * Chromium page. Scenarios are independent: every one gets its own app,
+ * counter, and (where used) browser.
+ *
+ * @example
+ * // Run the whole feature from the terminal (`pretest-bdd` builds first):
  * //   pnpm test-bdd
  * // Steps live in this file; the prose lives in features/greeting.feature.
  */
 export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
   Bdd.scenario("The home page greets in the chosen language").pipe(
-    Bdd.given`a POC app with the ${language} greeter`(
-      Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
-        return {
-          app: appProduction,
-          greeter: Layer.provideMerge(
-            Greeter.layerFor(language),
-            Incrementer.greetingCountLayer,
-          ),
-        };
-      }),
-    ),
-    Bdd.when`the app is running`(
-      Effect.fn("Greeting.appIsRunning")(function* (state) {
-        const port = yield* state.app.pipe(
-          HttpRouter.provideRequest(state.greeter),
-          startApp(0),
-        );
-
-        const url = `http://localhost:${port}`;
-        const api = yield* HttpApiClient.make(Api, { baseUrl: url });
-
-        return {
-          ...state,
-          url,
-          api,
-        };
-      }),
-    ),
+    givenAppInMode,
+    givenGreeterForLanguage,
+    whenAppIsRunning,
     Bdd.then`the home page says ${expected}`(
       Effect.fn("Greeting.homePageSays")(function* ({ expected }, state) {
         const body = yield* HttpClient.get(`${state.url}/`).pipe(
@@ -197,34 +269,9 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
     Bdd.provide(FetchHttpClient.layer),
   ),
   Bdd.scenario("The health check reports the configured greeter").pipe(
-    Bdd.given`a POC app with the ${language} greeter`(
-      Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
-        return {
-          app: appProduction,
-          greeter: Layer.provideMerge(
-            Greeter.layerFor(language),
-            Incrementer.greetingCountLayer,
-          ),
-        };
-      }),
-    ),
-    Bdd.when`the app is running`(
-      Effect.fn("Greeting.appIsRunning")(function* (state) {
-        const port = yield* state.app.pipe(
-          HttpRouter.provideRequest(state.greeter),
-          startApp(0),
-        );
-
-        const url = `http://localhost:${port}`;
-        const api = yield* HttpApiClient.make(Api, { baseUrl: url });
-
-        return {
-          ...state,
-          url,
-          api,
-        };
-      }),
-    ),
+    givenAppInMode,
+    givenGreeterForLanguage,
+    whenAppIsRunning,
     Bdd.then`the health check says status ${status} and greeting ${greeting}`(
       Effect.fn("Greeting.healthCheckSays")(function* ({ greeting, status }, state) {
         // Fully typed: `health()` takes no arguments and resolves to the
@@ -250,34 +297,9 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
     Bdd.provide(FetchHttpClient.layer),
   ),
   Bdd.scenario("The docs endpoint describes the API").pipe(
-    Bdd.given`a POC app with the ${language} greeter`(
-      Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
-        return {
-          app: appProduction,
-          greeter: Layer.provideMerge(
-            Greeter.layerFor(language),
-            Incrementer.greetingCountLayer,
-          ),
-        };
-      }),
-    ),
-    Bdd.when`the app is running`(
-      Effect.fn("Greeting.appIsRunning")(function* (state) {
-        const port = yield* state.app.pipe(
-          HttpRouter.provideRequest(state.greeter),
-          startApp(0),
-        );
-
-        const url = `http://localhost:${port}`;
-        const api = yield* HttpApiClient.make(Api, { baseUrl: url });
-
-        return {
-          ...state,
-          url,
-          api,
-        };
-      }),
-    ),
+    givenAppInMode,
+    givenGreeterForLanguage,
+    whenAppIsRunning,
     Bdd.then`the swagger docs and openapi document are served`(
       Effect.fn("Greeting.docsAreServed")(function* (state) {
         const docs = yield* HttpClient.get(`${state.url}/docs`).pipe(
@@ -313,38 +335,32 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
     Bdd.provide(FetchHttpClient.layer),
   ),
   Bdd.scenario("The reveal counts the page view and the health check").pipe(
-    Bdd.given`a POC app with the ${language} greeter`(
-      Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
-        return {
-          app: appProduction,
-          greeter: Layer.provideMerge(
-            Greeter.layerFor(language),
-            Incrementer.greetingCountLayer,
-          ),
-        };
-      }),
-    ),
-    Bdd.when`the app is running`(
-      Effect.fn("Greeting.appIsRunning")(function* (state) {
-        const port = yield* state.app.pipe(
-          HttpRouter.provideRequest(state.greeter),
-          startApp(0),
-        );
-
-        const url = `http://localhost:${port}`;
-        const api = yield* HttpApiClient.make(Api, { baseUrl: url });
-
-        return {
-          ...state,
-          url,
-          api,
-        };
-      }),
-    ),
+    givenAppInMode,
+    givenGreeterForLanguage,
+    whenAppIsRunning,
     Bdd.when`a browser opens the home page`(
       Effect.fn("Greeting.browserOpensHomePage")(function* (state) {
-        const browser = yield* Browser;
-        const page = yield* browser.newPage;
+        // The Scenario Resources pattern from the effect-bdd docs: acquire
+        // Chromium inside the step, so scenario-scope finalizers run LIFO -
+        // browser first, then the Next server. Acquiring it earlier (via
+        // `Bdd.provide`) would tear the server down while the page's HMR
+        // socket is still open, and a dev-mode Next refuses to close.
+        const { browser, page } = yield* Effect.acquireRelease(
+          Effect.gen(function* () {
+            const browser = yield* attempt("launch chromium", () =>
+              chromium.launch(),
+            );
+            const page = yield* attempt("open a page", () => browser.newPage());
+            return { browser, page };
+          }),
+          ({ browser }) =>
+            Effect.tryPromise(() => browser.close()).pipe(Effect.ignore),
+        );
+        // Before the first navigation: dev-mode chunk fetches must wait for
+        // Turbopack's on-demand compile (see `retryStaticChunks`).
+        yield* attempt("route the page's static chunks", () =>
+          retryStaticChunks(page),
+        );
         yield* attempt("open the home page", () => page.goto(`${state.url}/`));
         // The page render's own greeting is one of the two this reveal will
         // count, and the reveal only works through React: before hydration
@@ -404,6 +420,6 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
         return state;
       }),
     ),
-    Bdd.provide(Layer.mergeAll(FetchHttpClient.layer, browserLayer)),
+    Bdd.provide(FetchHttpClient.layer),
   ),
 );
