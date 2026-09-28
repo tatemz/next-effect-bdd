@@ -13,13 +13,12 @@
     "start": "MODE=production PORT=3456 LANGUAGE=en node main.ts",
     "start:next": "MODE=production PORT=3456 LANGUAGE=en node main.next.ts",
     "start:api": "PORT=3457 LANGUAGE=en node main.api.ts",
-    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose --parallel=2 --strict",
+    "test-bdd": "NODE_OPTIONS=\"--import tsx\" effect-bdd --features \"features/**/*.feature\" --steps \"features/**/*.steps.ts\" --reporter text --verbose --parallel=1 --strict",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-rc.117",
     "effect": "4.0.0-rc.117",
-
     "next": "^16.3.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -29,6 +28,7 @@
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.0",
     "effect-bdd": "^0.9.3",
+    "playwright": "^1.63.0",
     "tsx": "^4.23.13",
     "typescript": "7.0.2"
   }

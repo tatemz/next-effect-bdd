@@ -28,3 +28,11 @@ Feature: Greeting visitors
     Examples:
       | language |
       | en       |
+
+  Scenario: The reveal counts the page view and the health check
+    Given a POC app with the en greeter
+    When the app is running
+    And a browser opens the home page
+    And the health endpoint is hit
+    And the reveal button is clicked
+    Then the reveal reports greeting 2

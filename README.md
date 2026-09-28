@@ -74,7 +74,7 @@ main.ts                default entry point: the composed app
 main.next.ts           entry point: Next only (no /health, no /docs)
 main.api.ts            entry point: the Effect API only (no Next server boots)
 app/page.tsx           Next server component; runs Greeter against the request context
-features/              greeting feature: narrow outlines, one per surface
+features/              greeting feature: narrow outlines per surface + the Playwright reveal scenario
 ```
 
 Dependencies point one way: `app/` and `features/` -> `server/` -> `domain/`.
@@ -96,6 +96,14 @@ Scenario Outline: The docs endpoint describes the API
   Given a POC app with the <language> greeter
   When the app is running
   Then the swagger docs and openapi document are served
+
+Scenario: The reveal counts the page view and the health check
+  Given a POC app with the en greeter
+  When the app is running
+  And a browser opens the home page
+  And the health endpoint is hit
+  And the reveal button is clicked
+  Then the reveal reports greeting 2
 ```
 
 Each scenario makes one narrow claim about one surface: one outline covers
@@ -105,6 +113,15 @@ page and the API handler resolve the *same* `Greeter` instance built once per
 app. The health step calls the API through the `HttpApiClient` generated from
 `server/api.ts` (`state.api.health()`), not a raw fetch: the response is
 Schema-decoded, and field or contract drift is a compile error.
+
+The reveal scenario covers the one interaction no HTTP-only step can: a real
+headless Chromium (Playwright) loads `/`, the step hits `/health`, then the
+reveal button is clicked for real. Because the whole app shares one
+`Incrementer` built once per running app, the page view and the health check
+are greetings #1 and #2, and the reveal message must report greeting #2 —
+proof the server action reads the same counter the page and API share. The
+step waits for React to hydrate the form before clicking, so the click takes
+the server action and not the SSR form's native POST.
 
 ## Commands
 
@@ -122,7 +139,10 @@ pnpm start          # nothing is defaulted: PORT, LANGUAGE, and MODE are require
 pnpm start:next     #   e.g. PORT=3456 LANGUAGE=en MODE=production pnpm start
 pnpm start:api      #   (the API app needs only PORT and LANGUAGE: it has no mode)
 
-pnpm test-bdd       # effect-bdd: greeting feature (page + api + docs outlines)
+pnpm test-bdd       # effect-bdd: greeting feature (page + api + docs outlines,
+                    #   plus the Playwright reveal scenario)
+pnpm exec playwright install chromium  # once, before test-bdd: fetches the
+                    #   Chromium binary the reveal scenario launches headless
 ```
 
 ## Docker production
@@ -182,3 +202,5 @@ in exchange for simpler maintenance than file tracing. See the official
   `effect-bdd` tracks the v4 release-candidate train
 - `typescript@7` (native compiler) + `@effect/tsgo` — `pnpm exec tsc --noEmit`
   also reports Effect-specific diagnostics from the language service
+- `playwright` (dev-only) for the reveal scenario — run
+  `pnpm exec playwright install chromium` once to fetch its browser binary
