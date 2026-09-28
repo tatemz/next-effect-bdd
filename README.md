@@ -77,6 +77,17 @@ one narrow claim: the Next-rendered page greets per language, the typed
 A Playwright scenario proves the shared context: page view, health hit, and
 server action all read the *same* `Incrementer` instance.
 
+Every scenario runs in **both Next modes**, driven by a `mode` column in the
+Gherkin Examples tables (`Given a POC app in <mode> mode`): `production`
+serves the built `.next` output, `development` boots Next with on-demand
+compilation. Two Next 16 realities shape how the suite is launched (both
+verified against `next@16.3.6`): turbopack's compile registry is
+process-global, so a process hosts many prod servers but only the **first**
+dev one; and a booted dev Next leaks handles, so its process never exits on
+its own. Hence `pnpm test-bdd` runs one shared-process `@prod` lane, then
+one fresh-process example per `@dev` row — which is exactly why prod is the
+fast lane and dev the slow one.
+
 ## Commands
 
 ```sh
@@ -86,9 +97,17 @@ pnpm build          # next build (required before start/tests)
 pnpm dev            # composed app, with HMR; :next / :api run the variants
 pnpm start          # production; start:next / start:api for the variants
 
-pnpm test-bdd       # effect-bdd scenarios (run once beforehand:
-                    #   pnpm exec playwright install chromium)
+pnpm test-bdd       # both lanes: @prod examples (one process, fast), then
+                    # each @dev example in its own process (scripts/run-dev-
+                    # bdd.sh; slow by design). pretest-bdd builds first.
+                    # Run once beforehand:
+                    #   pnpm exec playwright install chromium
 ```
+
+The dev lane writes to `.next-dev/` (never `.next`, so it cannot clobber the
+production build) and restores the two files Next's dev typegen rewrites
+(`next-env.d.ts`, `tsconfig.json`). `pnpm test-bdd:prod` / `pnpm test-bdd:dev`
+run a single lane.
 
 `dev` scripts carry their own env; `start` respects `PORT`, `LANGUAGE`, and
 `MODE` from the environment (the API variant needs only `PORT` and
