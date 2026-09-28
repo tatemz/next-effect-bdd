@@ -7,6 +7,12 @@ import { FeedbackViewModel } from "./Feedback.model.ts";
  * revealed at. A function of the count so the revealed state has a single
  * source of truth for its wording; the count itself comes from the request's
  * `Incrementer`.
+ *
+ * @example
+ * import { revealedMessage } from "./Feedback.controller.ts";
+ *
+ * revealedMessage(7);
+ * // "The secret: this model round-tripped through a server action at greeting #7."
  */
 export const revealedMessage = (count: number) =>
   `The secret: this model round-tripped through a server action at greeting #${count}.`;
@@ -65,6 +71,10 @@ const formatIssue = SchemaIssue.makeFormatterDefault();
  * The failure view model for a schema issue: the formatted issue becomes the
  * `Failed` message. The `||` fallback makes the `NonEmptyString` invariant
  * unbreakable, so `make` here cannot throw.
+ *
+ * @example
+ * // Inside revealFromClient's failure path, for a decode failure:
+ * // failedFromIssue(issue); // { _tag: "Failed", message: <formatted issue> }
  */
 const failedFromIssue = (issue: SchemaIssue.Issue): FeedbackViewModel =>
   FeedbackViewModel.make({

@@ -55,6 +55,12 @@ export class Greeter extends Context.Service<
    *
    * The `Incrementer` requirement stays open on purpose: whoever composes
    * the app owns the counter's lifetime and identity.
+   *
+   * @example
+   * import { Greeter } from "./greeter.ts";
+   *
+   * // Inside Greeter, the public layers are just this preset applied:
+   * const layerEnglish = Greeter.layerGreeting("Hello!");
    */
   private static readonly layerGreeting = (message: string) =>
     Layer.effect(

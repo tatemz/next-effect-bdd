@@ -6,6 +6,21 @@ import { Incrementer } from "./domain/incrementer.ts";
 import { AppConfig, appFor } from "./server/app.ts";
 import { serveApp } from "./server/pipeline.ts";
 
+/**
+ * The default entry point: the Next app and the Effect HTTP API on one
+ * router.
+ *
+ * Reads `AppConfig` from the environment, composes `appFor(mode)` with the
+ * configured `Greeter` and its `greeting-count` `Incrementer`, then launches
+ * the served app until interrupted.
+ *
+ * @example
+ * // Build first (next build), then serve on the configured port:
+ * //   MODE=production PORT=3456 LANGUAGE=en node main.ts
+ * //   # or simply:
+ * //   pnpm start
+ * // http://localhost:3456 renders through Next; /health and /docs are API.
+ */
 if (import.meta.main) {
   // The default entry point: the Next app and the Effect HTTP API composed
   // on one router. Build from config, then launch until interrupted.

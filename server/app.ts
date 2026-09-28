@@ -15,12 +15,29 @@ import { Mode, nextDevelopment, nextProduction } from "./nextApp.ts";
  * the `Incrementer` the greeter bumps, so the composition root provides the
  * two merged (`Layer.provideMerge(greeterLayer, Incrementer.greetingCountLayer)`),
  * not just the `Greeter`.
+ *
+ * @example
+ * import { HttpRouter } from "effect/unstable/http";
+ * import { Greeter } from "../domain/greeter.ts";
+ * import { appProduction } from "./app.ts";
+ *
+ * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appProduction);
+ * // /health, /docs, and /openapi.json come from the API half; everything
+ * // else renders through Next.
  */
 export const appProduction = Layer.mergeAll(apiApp, nextProduction);
 
 /**
  * The combined app in development: the API plus the Next app with its HMR
  * upgrade paths and a dev-mode Next server.
+ *
+ * @example
+ * import { HttpRouter } from "effect/unstable/http";
+ * import { Greeter } from "../domain/greeter.ts";
+ * import { appDevelopment } from "./app.ts";
+ *
+ * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appDevelopment);
+ * // Same routes as production, plus Next's HMR upgrade paths and live reload.
  */
 export const appDevelopment = Layer.mergeAll(apiApp, nextDevelopment);
 

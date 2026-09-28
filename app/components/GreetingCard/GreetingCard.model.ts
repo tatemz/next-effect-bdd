@@ -21,12 +21,14 @@ const GreetingCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
  * import { GreetingCardViewModel } from "./GreetingCard.model.ts";
  *
  * GreetingCardViewModel.decodeUnknownSync({
+ *   _tag: "GreetingCard",
  *   message: "Hello!",
  *   count: 3,
  *   feedback: { _tag: "NotRevealed" },
  * });
- * // GreetingCardViewModel.decodeUnknownSync({ message: "Hello!", count: -1 });
- * // throws: count must be >= 0
+ * // GreetingCardViewModel.decodeUnknownSync({
+ * //   _tag: "GreetingCard", message: "Hello!", count: -1, feedback: { _tag: "NotRevealed" },
+ * // }); // throws: count must be >= 0
  */
 export type GreetingCardViewModel = typeof GreetingCardViewModel.Type;
 export const GreetingCardViewModel = Schema.TaggedStruct("GreetingCard", {

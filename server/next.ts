@@ -10,6 +10,19 @@ import { type AppDeps, runInRenderContext } from "./deps.ts";
 // real factory signature from its deep declaration file.
 type NextFactory = (typeof import("next/dist/server/next.js"))["default"];
 type NextServer = ReturnType<NextFactory>;
+
+/**
+ * The options accepted by `NextJs.layer`: Next's own constructor options.
+ *
+ * Bound to Next's real factory signature (not the namespace-typed CJS
+ * default), so `dev`, `hostname`, `port`, and the rest are exactly what the
+ * installed Next version declares.
+ *
+ * @example
+ * import type { NextOptions } from "./next.ts";
+ *
+ * const options: NextOptions = { dev: false, dir: "." };
+ */
 export type NextOptions = Parameters<NextFactory>[0];
 
 /**
@@ -183,6 +196,10 @@ export const nextCatchAll = HttpRouter.add(
  * Resolves immediately for an already-ended response; otherwise it parks on
  * the `finish` and `close` events, whichever fires first, so a render never
  * resolves before Next has written everything.
+ *
+ * @example
+ * // Inside NextJs.layer's `render`, after Next handled the request:
+ * yield* awaitFinished(res); // now safe to return the sentinel response
  */
 const awaitFinished = (res: ServerResponse) =>
   res.writableEnded || res.finished

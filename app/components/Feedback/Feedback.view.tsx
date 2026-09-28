@@ -6,6 +6,12 @@ import styles from "./Feedback.module.css";
  * the connected view supplies. Keeping `dispatch`/`isPending` as explicit
  * props keeps this file free of client state, so it stays renderable outside
  * the action (previews, tests).
+ *
+ * @example
+ * import { Feedback } from "./Feedback.view.tsx";
+ *
+ * // Renderable from plain data, with no server action attached:
+ * // <Feedback {...encoded} dispatch={() => {}} isPending={false} />
  */
 export type FeedbackProps = typeof FeedbackViewModel.Encoded & {
   readonly dispatch: (formData: FormData) => void;
@@ -18,6 +24,18 @@ export type FeedbackProps = typeof FeedbackViewModel.Encoded & {
  * and `Failed` shows the error with a retry (the controller re-runs the
  * reveal for that submit). A new union case is a compile error here until
  * the view handles it.
+ *
+ * @example
+ * import { Feedback } from "./Feedback.view.tsx";
+ *
+ * // NotRevealed renders the "Reveal me!" form; Revealed and Failed render
+ * // their message. Example with the revealed state:
+ * // <Feedback
+ * //   _tag="Revealed"
+ * //   message="The secret: … at greeting #2."
+ * //   dispatch={() => {}}
+ * //   isPending={false}
+ * // />
  */
 export const Feedback = ({ dispatch, isPending, ...model }: FeedbackProps) =>
   FeedbackViewModel.match(model, {

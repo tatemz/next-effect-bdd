@@ -37,6 +37,9 @@ export const apiApp = Layer.mergeAll(
  * defaulted; the API app has no mode because it has no variants.
  *
  * @example
+ * import { Effect } from "effect";
+ * import { ApiAppConfig } from "./apiApp.ts";
+ *
  * // With PORT=3457 LANGUAGE=es in the environment:
  * Effect.runSync(ApiAppConfig); // { language: "es", port: 3457 }
  */

@@ -16,15 +16,63 @@ import { Api } from "../server/api.ts";
 import { appProduction } from "../server/app.ts";
 import { startApp } from "../server/pipeline.ts";
 
+/**
+ * Captures a language name from a step, validated by the `Language` schema.
+ *
+ * A step like `a POC app with the es greeter` binds `language` to `"es"`;
+ * any other language fails the step at parse time, not deeper in the run.
+ *
+ * @example
+ * // Matches: "a POC app with the en greeter" -> { language: "en" }
+ * // Bdd.given`a POC app with the ${language} greeter`(step);
+ */
 const language = Bdd.capture("language", Language);
+/**
+ * Captures an expected health status string from a step.
+ *
+ * @example
+ * // Matches: "the health check says status ok and greeting Hello!"
+ * // -> { status: "ok", greeting: "Hello!" }
+ * // Bdd.then`the health check says status ${status} and greeting ${greeting}`(step);
+ */
 const status = Bdd.capture("status", Schema.String);
+/**
+ * Captures an expected greeting string from a step.
+ *
+ * @example
+ * // Matches: "the health check says status ok and greeting ¡Hola!"
+ * // -> { greeting: "¡Hola!" }
+ * // Bdd.then`the health check says status ${status} and greeting ${greeting}`(step);
+ */
 const greeting = Bdd.capture("greeting", Schema.String);
+/**
+ * Captures an arbitrary expected string from a step.
+ *
+ * @example
+ * // Matches: "the home page says Hello!" -> { expected: "Hello!" }
+ * // Bdd.then`the home page says ${expected}`(step);
+ */
 const expected = Bdd.capture("expected", Schema.String);
+/**
+ * Captures a greeting count from a step, parsed from its digits.
+ *
+ * `FiniteFromString` turns the captured text into a number, so the step can
+ * compare it numerically against the reveal's reported count.
+ *
+ * @example
+ * // Matches: "the reveal reports greeting 2" -> { greetingNumber: 2 }
+ * // Bdd.then`the reveal reports greeting ${greetingNumber}`(step);
+ */
 const greetingNumber = Bdd.capture("greetingNumber", Schema.FiniteFromString);
 
 /**
  * Runs a Playwright promise-returning call as an Effect, naming the call in
  * the failure so a browser timeout says which interaction timed out.
+ *
+ * @example
+ * // A failed navigation fails with "open the home page: <reason>",
+ * // not an anonymous rejected promise:
+ * // yield* attempt("open the home page", () => page.goto(url));
  */
 const attempt = <A>(label: string, f: () => Promise<A>) =>
   Effect.tryPromise({
@@ -40,15 +88,37 @@ const attempt = <A>(label: string, f: () => Promise<A>) =>
  * acquired when the scenario's provider layer builds and closed when the
  * scenario's scope closes, so a crashed or hung page cannot leak a Chromium
  * process into the next scenario.
+ *
+ * @example
+ * // Inside a browser-driving step, the file's own `Browser` service:
+ * const browser = yield* Browser;
+ * const page = yield* browser.newPage; // fresh tab for this scenario
  */
 class Browser extends Context.Service<
   Browser,
   {
-    /** A fresh page in this scenario's browser. */
+    /**
+     * A fresh page in this scenario's browser.
+     *
+     * Opens a new tab; the owning scenario's scope closes the whole browser,
+     * so callers do not close pages individually.
+     *
+     * @example
+     * const browser = yield* Browser;
+     * const page = yield* browser.newPage;
+     */
     readonly newPage: Effect.Effect<Page, string>;
   }
 >()("Browser") {}
 
+/**
+ * Provides the scenario's `Browser`, launching Chromium when the scenario's
+ * layer builds and closing it when its scope closes.
+ *
+ * @example
+ * // Wired into the scenarios that drive a real browser (same file):
+ * // Bdd.provide(Layer.mergeAll(FetchHttpClient.layer, browserLayer));
+ */
 const browserLayer = Layer.effect(
   Browser,
   Effect.gen(function* () {
@@ -64,6 +134,20 @@ const browserLayer = Layer.effect(
   }),
 );
 
+/**
+ * The app's Gherkin feature: the scenarios that pin the POC's observable
+ * behavior end to end.
+ *
+ * Each scenario builds the real app (`appProduction` with the chosen
+ * `Greeter`), starts it on an ephemeral port via `startApp(0)`, and asserts
+ * over HTTP, the typed `Api` client, or a real Chromium page. Scenarios are
+ * independent: every one gets its own app, counter, and (where used) browser.
+ *
+ * @example
+ * // Run the whole feature from the terminal:
+ * //   pnpm test-bdd
+ * // Steps live in this file; the prose lives in features/greeting.feature.
+ */
 export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
   Bdd.scenario("The home page greets in the chosen language").pipe(
     Bdd.given`a POC app with the ${language} greeter`(

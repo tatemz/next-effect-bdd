@@ -4,7 +4,19 @@ import { HttpRouter, HttpServerRequest } from "effect/unstable/http";
 import { Language } from "../domain/greeter.ts";
 import { NextJs, nextCatchAll } from "./next.ts";
 
-/** The closed set of ways the Next app can be composed. Adding one breaks `nextFor`. */
+/**
+ * The closed set of ways the Next app can be composed.
+ *
+ * A `Schema.Literals` union, so any other string fails decoding, and adding
+ * a mode without a branch in `nextFor` is a type error: the set and its
+ * compositions cannot drift apart.
+ *
+ * @example
+ * import { Mode } from "./nextApp.ts";
+ *
+ * Mode.decodeUnknownSync("development"); // "development"
+ * // Mode.decodeUnknownSync("staging"); // throws: expected "production" | "development"
+ */
 export const Mode = Schema.Literals(["production", "development"]);
 export type Mode = typeof Mode.Type;
 
@@ -44,6 +56,12 @@ const hmrUpgrade = Effect.fn("NextApp.hmrUpgrade")(function* (
  *
  * Part of the development composition only; each path routes to
  * `hmrUpgrade`.
+ *
+ * @example
+ * // The routes this layer registers, as a sketch:
+ * //   HttpRouter.add("GET", "/_next/webpack-hmr", hmrUpgrade)
+ * //   HttpRouter.add("GET", "/_next/hmr", hmrUpgrade)
+ * // nextDevelopment already merges them in, so apps use it directly.
  */
 const hmrRoutes = Layer.mergeAll(
   HttpRouter.add("GET", "/_next/webpack-hmr", hmrUpgrade),
@@ -55,6 +73,17 @@ const hmrRoutes = Layer.mergeAll(
  * router does not already route goes to the `NextJs` service, which renders
  * it with a production Next server. HMR upgrade paths do not exist in this
  * app - they are not filtered out, they were never built.
+ *
+ * @example
+ * import { Layer } from "effect";
+ * import { HttpRouter } from "effect/unstable/http";
+ * import { Greeter } from "../domain/greeter.ts";
+ * import { serveApp } from "./pipeline.ts";
+ * import { nextProduction } from "./nextApp.ts";
+ *
+ * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(nextProduction);
+ * Layer.launch(serveApp(3456)(app));
+ * // http://localhost:3456 renders every unmatched route through Next.
  */
 export const nextProduction = HttpRouter.provideRequest(NextJs.layer({ dev: false }))(
   nextCatchAll,
@@ -66,6 +95,17 @@ export const nextProduction = HttpRouter.provideRequest(NextJs.layer({ dev: fals
  * platform's `upgrade` listener runs this same router, so those paths reach
  * Next's upgrade handler and live refresh works through the Effect server
  * unchanged.
+ *
+ * @example
+ * import { Layer } from "effect";
+ * import { HttpRouter } from "effect/unstable/http";
+ * import { Greeter } from "../domain/greeter.ts";
+ * import { serveApp } from "./pipeline.ts";
+ * import { nextDevelopment } from "./nextApp.ts";
+ *
+ * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(nextDevelopment);
+ * Layer.launch(serveApp(3456)(app));
+ * // Same as production, plus Next's HMR upgrade paths: edits hot-reload.
  */
 export const nextDevelopment = HttpRouter.provideRequest(NextJs.layer({ dev: true }))(
   Layer.mergeAll(nextCatchAll, hmrRoutes),
@@ -106,6 +146,9 @@ export const nextFor = (mode: Mode) =>
  * values fail at startup with a typed `ConfigError`.
  *
  * @example
+ * import { Effect } from "effect";
+ * import { NextAppConfig } from "./nextApp.ts";
+ *
  * // With PORT=3456 LANGUAGE=en MODE=development in the environment:
  * Effect.runSync(NextAppConfig); // { mode: "development", language: "en", port: 3456 }
  */

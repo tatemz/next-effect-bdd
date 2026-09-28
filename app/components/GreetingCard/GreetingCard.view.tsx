@@ -9,6 +9,19 @@ import { ConnectedFeedback } from "../Feedback/Feedback.connected.view.tsx";
  *
  * The BDD scenario pins the exact markup `<main id="message">…</main>`, so
  * `main` stays attribute-free (the module styles it via `.page main`).
+ *
+ * @example
+ * import { GreetingCardViewModel } from "./GreetingCard.model.ts";
+ * import { GreetingCard } from "./GreetingCard.view.tsx";
+ *
+ * const model: GreetingCardViewModel = {
+ *   _tag: "GreetingCard",
+ *   message: "Hello!",
+ *   count: 1,
+ *   feedback: { _tag: "NotRevealed" },
+ * };
+ * // <GreetingCard {...model} /> renders <main id="message">Hello!</main>
+ * // and a "Greeting #1" counter above the reveal form.
  */
 export const GreetingCard = (model: GreetingCardViewModel) => (
   <div className={styles.page}>

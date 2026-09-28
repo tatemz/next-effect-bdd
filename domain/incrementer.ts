@@ -38,9 +38,32 @@ import { Context, Effect, Layer, Metric, Queue } from "effect";
 export class Incrementer extends Context.Service<
   Incrementer,
   {
-    /** Enqueue an increment of `by` (default `1`); returns as soon as it is accepted. */
+    /**
+     * Enqueue an increment of `by` (default `1`).
+     *
+     * Returns as soon as the command is accepted; the background worker
+     * applies it later, so `value` may lag this call for a moment.
+     *
+     * @example
+     * import { Incrementer } from "./incrementer.ts";
+     *
+     * const incrementer = yield* Incrementer;
+     * yield* incrementer.increment(); // accepted +1, applied asynchronously
+     * yield* incrementer.increment(4); // accepted +4
+     */
     readonly increment: (by?: number) => Effect.Effect<void>;
-    /** The last applied count; may lag the accepted `increment` commands. */
+    /**
+     * The last applied count.
+     *
+     * Eventually consistent: it may lag the accepted `increment` commands,
+     * but it never decreases.
+     *
+     * @example
+     * import { Incrementer } from "./incrementer.ts";
+     *
+     * const incrementer = yield* Incrementer;
+     * const count = yield* incrementer.value; // e.g. 5
+     */
     readonly value: Effect.Effect<number>;
   }
 >()("Incrementer") {
@@ -106,6 +129,11 @@ export class Incrementer extends Context.Service<
    * (`Layer.provide(greeterLayer, Incrementer.greetingCountLayer)`), which
    * keeps the wiring visible at the composition and lets a test swap in its
    * own counter.
+   *
+   * @example
+   * import { Incrementer } from "./incrementer.ts";
+   *
+   * const counter = Incrementer.greetingCountLayer; // Layer.Layer<Incrementer>
    */
   static readonly greetingCountLayer = Incrementer.layer("greeting-count");
 }
