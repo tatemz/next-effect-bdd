@@ -1,23 +1,21 @@
-# Allow only build inputs; exclude local state, credentials and test tooling.
-**
-!package.json
-!pnpm-lock.yaml
-!pnpm-workspace.yaml
-!tsconfig.json
-!next-env.d.ts
-!next.config.*
-!main.ts
-!app/
-!app/**
-!domain/
-!domain/**
-!server/
-!server/**
-!public/
-!public/**
-!scripts/
-!scripts/package-runtime.mjs
+# Local state and generated output must not overwrite the container build.
+.git
+**/node_modules
+**/.next
+**/.output
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+**/.DS_Store
+.zed
+.github
+
+# Supply secrets at runtime (or via BuildKit secrets), never in the context.
 **/.env*
+**/.npmrc
 **/*.pem
 **/*.key
-**/node_modules
+
+# Not needed to compile or run the production app.
+README.md
+features

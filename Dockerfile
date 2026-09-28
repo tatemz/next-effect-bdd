@@ -1,38 +1,42 @@
 # syntax=docker/dockerfile:1
-FROM node:24-alpine3.24 AS base
-
-FROM base AS builder
+FROM node:24-alpine3.24@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+
+FROM base AS dependencies
 RUN npm install --global pnpm@11.22.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+
+FROM dependencies AS production-dependencies
+# The root prepare script needs dev-only @effect/tsgo. Runtime native packages
+# use prebuilt binaries; revisit this flag if a new dependency needs scripts.
+RUN --mount=type=cache,id=next-effect-bdd-pnpm,target=/pnpm/store \
+    pnpm install --prod --frozen-lockfile --ignore-scripts --store-dir=/pnpm/store
+
+FROM dependencies AS builder
+RUN --mount=type=cache,id=next-effect-bdd-pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir=/pnpm/store
 COPY . .
-RUN pnpm build && NODE_ENV=production node scripts/package-runtime.mjs
+RUN pnpm build && rm -rf .next/cache && mkdir -p .next/cache public
 
-FROM base AS runtime
-RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
-    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg
-
-# Flatten the cleaned runtime so deleted package managers do not occupy layers.
-# Keep Node's matching Alpine libraries, CA certificates and non-root user.
-FROM scratch AS runner
-COPY --from=runtime / /
-WORKDIR /app
+FROM base AS runner
 ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
     MODE=production \
     LANGUAGE=en \
     PORT=3000
 
-# Custom Effect server + Next production traces, not Next's standalone server.
-COPY --from=builder --chown=1000:1000 /app/.output ./
-USER 1000:1000
+# Next standalone output does not support this custom Effect server.
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY package.json main.ts ./
+COPY server ./server
+COPY domain ./domain
+
+USER node
 EXPOSE 3000
-STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.PORT+'/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
-# Keep Node as PID 1 so Effect receives SIGTERM and closes its scoped resources.
+# Exec form lets Effect receive SIGTERM and close its scoped resources.
 CMD ["node", "main.ts"]

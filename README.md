@@ -127,55 +127,53 @@ pnpm test-bdd       # effect-bdd: greeting feature (page + api + docs outlines)
 
 ## Docker production
 
-The multistage image builds with `node:24-alpine3.24`. Its final stage copies
-a cleaned Node/Alpine filesystem into `scratch`, retaining the matching system
-libraries, CA certificates, and non-root user without npm, pnpm, or Yarn in
-any runtime layer. It runs the custom Effect server in `main.ts`, not Next.js
-standalone output (incompatible with this custom server). The build uses pnpm
-`11.22.0` with a frozen lockfile; runtime files are selected using `@vercel/nft` for the custom server and Next.js `.nft`
-trace manifests, keeping build dependencies and build caches out of the
-runtime image.
+The multistage image uses the official `node:24-alpine3.24` base pinned to a
+multi-architecture digest. Separate full-build and production-only dependency
+installs use pnpm `11.22.0` with frozen lockfiles. The runtime includes production
+dependencies, the normal Next.js `.next` build, `public/`, `server/`, `domain/`,
+and `main.ts`. Next.js standalone output is incompatible with this custom server.
+
+The production install uses `--ignore-scripts` because `prepare` needs the
+dev-only Effect `tsgo` tooling. Current native runtime dependencies use prebuilt
+optional packages; revisit this flag when adding a dependency that requires
+install scripts. `effect-bdd` remains a development-only dependency.
 
 ```sh
 docker build -t next-effect-bdd .
-docker run --rm --name next-effect-bdd -p 3000:3000 --stop-timeout 30 next-effect-bdd
+docker run -d --name next-effect-bdd -p 3000:3000 --stop-timeout 30 next-effect-bdd
+curl --fail http://localhost:3000/health  # once startup completes
+docker inspect --format '{{.State.Health.Status}}' next-effect-bdd
+docker stop next-effect-bdd
+docker inspect --format '{{.State.ExitCode}}' next-effect-bdd
+docker rm next-effect-bdd
 ```
 
-From another terminal, check the health endpoint, the docs, and the home page:
+Defaults are `MODE=production`, `PORT=3000`, `LANGUAGE=en`,
+`NODE_ENV=production`, and `NEXT_TELEMETRY_DISABLED=1`. Override them with
+`docker run -e`, for example `-e LANGUAGE=es`; changing `PORT` also requires a
+matching container port mapping. The app also serves `/`, `/docs` (Swagger UI),
+and `/openapi.json`.
 
-```sh
-curl --fail http://localhost:3000/health
-curl --fail http://localhost:3000/docs          # Swagger UI
-curl --fail http://localhost:3000/openapi.json  # the OpenAPI document
-curl --fail http://localhost:3000/
-```
+The container runs as non-root `node` (UID 1000). Source and dependencies are
+root-owned; only `.next` is writable by the app within its application directory.
+Keep any mounted `.next` or `.next/cache` writable by UID 1000. Exec-form
+`node main.ts` runs as PID 1, retaining Effect's signal handling and graceful
+SIGTERM shutdown. `--stop-timeout 30` allows 30 seconds before forced termination;
+Effect reports normal interruption with exit code 130. Docker's healthcheck uses
+`/health`.
 
-Defaults are `PORT=3000`, `LANGUAGE=en`, `MODE=production`,
-`NODE_ENV=production`, and `NEXT_TELEMETRY_DISABLED=1`. Override configuration
-with runtime environment variables; changing `PORT` requires a matching
-container port in the mapping. For example, to use Spanish on port 8080:
+For deployment, use a reverse proxy with TLS, rate limits, appropriate timeouts,
+and streaming support. Set memory and other resource limits for the workload,
+and plan shared cache coordination for multiple replicas. Supply secrets at
+runtime, not during the build. Digest pinning requires periodic security updates,
+rebuilds, and image scanning; these defaults alone do not guarantee production
+readiness.
 
-```sh
-docker run --rm --name next-effect-bdd -e PORT=8080 -e LANGUAGE=es -p 8080:8080 --stop-timeout 30 next-effect-bdd
-```
-
-The container runs as non-root `node` (UID 1000), with writable `.next/cache`,
-and uses `/health` for its healthcheck. Node runs directly via exec, preserving
-Effect's SIGTERM graceful shutdown; `--stop-timeout 30` allows 30 seconds
-before Docker forces termination. Effect reports a normal interruption with exit
-code 130. Keep any mounted `.next/cache` writable by UID 1000. Use a reverse proxy for TLS in production. Never bake secrets into
-the image or pass them at build time; supply them only through runtime
-environment variables.
-
-To smoke-test a built image (requires Node 24 and Docker):
-
-```sh
-node scripts/smoke-docker.mjs next-effect-bdd
-```
-
-This checks the English greeting, Next page and static assets, 404 responses,
-non-root permissions, Docker health status, and graceful shutdown. It removes
-its temporary container when finished.
+Keeping the full production dependency tree deliberately accepts a larger image
+in exchange for simpler maintenance than file tracing. See the official
+[Next.js custom server guidance](https://nextjs.org/docs/app/guides/custom-server),
+[pnpm Docker guidance](https://pnpm.io/docker), and
+[Docker build best practices](https://docs.docker.com/build/building/best-practices/).
 
 ## Requirements
 
