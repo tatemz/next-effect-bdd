@@ -2,6 +2,7 @@ import { NodeRuntime } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import { Greeter } from "./domain/greeter.ts";
+import { Incrementer } from "./domain/incrementer.ts";
 import { ApiAppConfig, apiApp } from "./server/apiApp.ts";
 import { serveApp } from "./server/pipeline.ts";
 
@@ -12,7 +13,14 @@ if (import.meta.main) {
   const AppLayer = Layer.unwrap(
     Effect.gen(function* () {
       const { language, port } = yield* ApiAppConfig;
-      const appWithGreeter = HttpRouter.provideRequest(Greeter.layerFor(language))(apiApp);
+      // Composition root: wire the greeter's "greeting-count" Incrementer.
+      // provideMerge keeps the counter in the request context too, so a
+      // handler could read the very instance the greeter bumps.
+      const greeter = Layer.provideMerge(
+        Greeter.layerFor(language),
+        Incrementer.greetingCountLayer,
+      );
+      const appWithGreeter = HttpRouter.provideRequest(greeter)(apiApp);
       return serveApp(port)(appWithGreeter);
     }),
   );

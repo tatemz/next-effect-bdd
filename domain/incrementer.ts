@@ -30,7 +30,9 @@ import { Context, Effect, Layer, Metric, Queue } from "effect";
  *   return count;
  * });
  *
- * const count = await Effect.runPromise(Effect.provide(program, Incrementer.layer));
+ * const count = await Effect.runPromise(
+ *   Effect.provide(program, Incrementer.layer("greeting-count")),
+ * );
  * // count === 5
  */
 export class Incrementer extends Context.Service<
@@ -43,48 +45,67 @@ export class Incrementer extends Context.Service<
   }
 >()("Incrementer") {
   /**
-   * The live `Incrementer`: an unbounded command queue, one worker fiber
-   * applying commands to the counter, and a private `MetricRegistry` so the
-   * count cannot collide with metrics registered elsewhere.
+   * The live `Incrementer` for a named counter: an unbounded command queue,
+   * one worker fiber applying commands to the counter, and a private
+   * `MetricRegistry` so the count cannot collide with metrics registered
+   * elsewhere.
    *
    * The worker fiber is scoped to the layer; closing the layer's scope shuts
    * the queue down, after which `increment` dies rather than silently
    * dropping the command.
+   *
+   * @example
+   * import { Incrementer } from "./incrementer.ts";
+   *
+   * const greetingCounter = Incrementer.layer("greeting-count");
    */
-  static readonly layer = Layer.effect(
-    Incrementer,
-    Effect.gen(function* () {
-      const commands = yield* Queue.unbounded<number>();
-      const registry: Metric.MetricRegistry = new Map();
-      const counter = Metric.counter("incrementer_total", {
-        description: "Total applied increments",
-        incremental: true,
-      });
+  static readonly layer = (counterName: string) =>
+    Layer.effect(
+      Incrementer,
+      Effect.gen(function* () {
+        const commands = yield* Queue.unbounded<number>();
+        const registry: Metric.MetricRegistry = new Map();
+        const counter = Metric.counter(counterName, {
+          description: `Total applied increments (${counterName})`,
+          incremental: true,
+        });
 
-      const worker = Effect.forever(
-        Queue.take(commands).pipe(
-          Effect.flatMap((by) => Metric.update(counter, by)),
-        ),
-      );
-      yield* Effect.provideService(worker, Metric.MetricRegistry, registry).pipe(
-        Effect.forkScoped,
-      );
-
-      return Incrementer.of({
-        increment: (by = 1) =>
-          Queue.offer(commands, by).pipe(
-            Effect.flatMap((accepted) =>
-              accepted
-                ? Effect.void
-                : Effect.die("Incrementer is shut down"),
-            ),
+        const worker = Effect.forever(
+          Queue.take(commands).pipe(
+            Effect.flatMap((by) => Metric.update(counter, by)),
           ),
-        value: Effect.provideService(
-          Effect.map(Metric.value(counter), (state) => state.count),
-          Metric.MetricRegistry,
-          registry,
-        ),
-      });
-    }),
-  );
+        );
+        yield* Effect.provideService(worker, Metric.MetricRegistry, registry).pipe(
+          Effect.forkScoped,
+        );
+
+        return Incrementer.of({
+          increment: (by = 1) =>
+            Queue.offer(commands, by).pipe(
+              Effect.flatMap((accepted) =>
+                accepted
+                  ? Effect.void
+                  : Effect.die("Incrementer is shut down"),
+              ),
+            ),
+          value: Effect.provideService(
+            Effect.map(Metric.value(counter), (state) => state.count),
+            Metric.MetricRegistry,
+            registry,
+          ),
+        });
+      }),
+    );
+
+  /**
+   * The `"greeting-count"` counter: one `greet`, one increment.
+   *
+   * Named here so the counter's identity belongs to the counting domain,
+   * not to whichever feature happens to be counted. Composition roots
+   * provide this layer at the top of the call stack
+   * (`Layer.provide(greeterLayer, Incrementer.greetingCountLayer)`), which
+   * keeps the wiring visible at the composition and lets a test swap in its
+   * own counter.
+   */
+  static readonly greetingCountLayer = Incrementer.layer("greeting-count");
 }

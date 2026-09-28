@@ -97,6 +97,16 @@
   filter: drop-shadow(0 12px 32px rgba(99, 102, 241, 0.35));
 }
 
+/* The incrementer's greeting count, read at render time. */
+.counter {
+  margin: -0.75rem 0 0;
+  color: #7dd3fc;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
 .caption {
   margin: 0;
   max-width: 34ch;

@@ -80,10 +80,16 @@ export const nextDevelopment = HttpRouter.provideRequest(NextJs.layer({ dev: tru
  * import { Layer } from "effect";
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
+ * import { Incrementer } from "../domain/incrementer.ts";
  * import { serveApp } from "./pipeline.ts";
  * import { nextFor } from "./nextApp.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(nextFor("development"));
+ * // Merged, so page renders can also read the counter the greeter bumps.
+ * const greeter = Layer.provideMerge(
+ *   Greeter.layerFor("en"),
+ *   Incrementer.greetingCountLayer,
+ * );
+ * const app = HttpRouter.provideRequest(greeter)(nextFor("development"));
  * Layer.launch(serveApp(3456)(app));
  * // http://localhost:3456 renders through Next; no API routes exist here.
  */

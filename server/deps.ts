@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Context } from "effect";
 import type { Greeter } from "../domain/greeter.ts";
+import type { Incrementer } from "../domain/incrementer.ts";
 
 /**
  * The services the running app injects into every page render.
@@ -12,14 +13,18 @@ import type { Greeter } from "../domain/greeter.ts";
  * @example
  * import { Context, Effect } from "effect";
  * import { Greeter } from "../domain/greeter.ts";
+ * import { Incrementer } from "../domain/incrementer.ts";
  * import type { AppDeps } from "./deps.ts";
  *
  * const context: Context.Context<AppDeps> = Context.make(
  *   Greeter,
  *   Greeter.of({ greet: Effect.succeed("Hello!") }),
- * );
+ * ).pipe(Context.add(Incrementer, Incrementer.of({
+ *   increment: () => Effect.void,
+ *   value: Effect.succeed(0),
+ * })));
  */
-export type AppDeps = Greeter;
+export type AppDeps = Greeter | Incrementer;
 
 declare global {
   // Stashed on globalThis so the store is shared even when Next's page bundle

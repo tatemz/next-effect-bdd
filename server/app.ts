@@ -11,7 +11,10 @@ import { Mode, nextDevelopment, nextProduction } from "./nextApp.ts";
  *
  * Both halves still require a `Greeter` per request (the API handler and the
  * page renders resolve the same instance) and leave it for the caller to
- * provide with `HttpRouter.provideRequest`.
+ * provide with `HttpRouter.provideRequest`. Page renders additionally read
+ * the `Incrementer` the greeter bumps, so the composition root provides the
+ * two merged (`Layer.provideMerge(greeterLayer, Incrementer.greetingCountLayer)`),
+ * not just the `Greeter`.
  */
 export const appProduction = Layer.mergeAll(apiApp, nextProduction);
 
@@ -31,10 +34,15 @@ export const appDevelopment = Layer.mergeAll(apiApp, nextDevelopment);
  * import { Layer } from "effect";
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
+ * import { Incrementer } from "../domain/incrementer.ts";
  * import { serveApp } from "./pipeline.ts";
  * import { appFor } from "./app.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appFor("production"));
+ * const greeter = Layer.provideMerge(
+ *   Greeter.layerFor("en"),
+ *   Incrementer.greetingCountLayer,
+ * );
+ * const app = HttpRouter.provideRequest(greeter)(appFor("production"));
  * Layer.launch(serveApp(3456)(app));
  * // /health, /docs, and /openapi.json come from the API half; everything
  * // else renders through Next.

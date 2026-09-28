@@ -1,5 +1,5 @@
 import { Bdd } from "effect-bdd";
-import { Duration, Effect, Schema } from "effect";
+import { Duration, Effect, Layer, Schema } from "effect";
 import {
   FetchHttpClient,
   HttpClient,
@@ -8,6 +8,7 @@ import {
 } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 import { Greeter, Language } from "../domain/greeter.ts";
+import { Incrementer } from "../domain/incrementer.ts";
 import { Api } from "../server/api.ts";
 import { appProduction } from "../server/app.ts";
 import { startApp } from "../server/pipeline.ts";
@@ -23,7 +24,10 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
       Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
         return {
           app: appProduction,
-          greeter: Greeter.layerFor(language),
+          greeter: Layer.provideMerge(
+            Greeter.layerFor(language),
+            Incrementer.greetingCountLayer,
+          ),
         };
       }),
     ),
@@ -70,7 +74,10 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
       Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
         return {
           app: appProduction,
-          greeter: Greeter.layerFor(language),
+          greeter: Layer.provideMerge(
+            Greeter.layerFor(language),
+            Incrementer.greetingCountLayer,
+          ),
         };
       }),
     ),
@@ -122,7 +129,10 @@ export const greetingVisitors = Bdd.feature("Greeting visitors").pipe(
       Effect.fn("Greeting.appWithGreeter")(function* ({ language }) {
         return {
           app: appProduction,
-          greeter: Greeter.layerFor(language),
+          greeter: Layer.provideMerge(
+            Greeter.layerFor(language),
+            Incrementer.greetingCountLayer,
+          ),
         };
       }),
     ),
