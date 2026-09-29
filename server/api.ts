@@ -100,15 +100,19 @@ export type ApiClient = HttpApiClient.ForApi<typeof Api>;
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
  * import { Api, HealthHandlers } from "./api.ts";
+ * import { Language } from "./config.ts";
  *
  * const apiLayer = HttpApiBuilder.layer(Api).pipe(Layer.provide(HealthHandlers));
- * const routes = HttpRouter.provideRequest(Greeter.layerFor("en"))(apiLayer);
+ * const routes = HttpRouter.provideRequest(
+ *   Greeter.layerFor(Language.English),
+ * )(apiLayer);
  */
 export const HealthHandlers = HttpApiBuilder.group(Api, "system", (handlers) =>
   handlers.handleAll({
     health: Effect.fn("Api.health")(function* () {
       const greeter = yield* Greeter;
-      return { status: "ok", greeting: yield* greeter.greet } as const;
+      const greeting = yield* greeter.greet;
+      return { status: "ok", greeting } as const;
     }),
   }),
 );

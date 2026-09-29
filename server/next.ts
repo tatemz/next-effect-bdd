@@ -6,24 +6,38 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { type AppDeps, runInRenderContext } from "./deps.ts";
 
-// Next's CJS entry types `import Next from "next"` as a namespace, so bind the
-// real factory signature from its deep declaration file.
+// Next's CJS entry types `import Next from "next"` as a namespace, so bind
+// the real factory - value and signature - from its deep declaration file.
 type NextFactory = (typeof import("next/dist/server/next.js"))["default"];
 type NextServer = ReturnType<NextFactory>;
+const createNext = Next as unknown as NextFactory;
 
 /**
- * The options accepted by `NextJs.layer`: Next's own constructor options.
+ * The options accepted by Next's own factory, bound to its real signature
+ * (not the namespace-typed CJS default).
+ */
+type NextOptions = Parameters<NextFactory>[0];
+
+/**
+ * The options accepted by `NextJs.layer`: Next's own constructor options,
+ * except `conf`.
  *
- * Bound to Next's real factory signature (not the namespace-typed CJS
- * default), so `dev`, `hostname`, `port`, and the rest are exactly what the
- * installed Next version declares.
+ * Next types `conf` as the *completed* config, but its loader accepts any
+ * subset and fills the defaults; typing `conf` as what callers actually
+ * pass keeps construction sites honest (one cast remains, in `layer`, at
+ * the gap in Next's own types).
  *
  * @example
- * import type { NextOptions } from "./next.ts";
+ * import type { NextAppConfig } from "./next.ts";
  *
- * const options: NextOptions = { dev: false, dir: "." };
+ * const prod: NextAppConfig = { dev: false };
+ * const dev: NextAppConfig = { dev: true, conf: { distDir: ".next-dev" } };
  */
-export type NextOptions = Parameters<NextFactory>[0];
+export type NextAppConfig = Omit<NextOptions, "conf" | "dev"> & {
+  readonly dev: boolean;
+  /** Partial overrides of `next.config.ts`, filled by Next's config loader. */
+  readonly conf?: Record<string, unknown>;
+};
 
 /**
  * A Next.js promise rejected at one of its lifecycle stages.
@@ -121,13 +135,15 @@ export class NextJs extends Context.Service<
    *
    * const routes = HttpRouter.provideRequest(NextJs.layer({ dev: false }))(nextCatchAll);
    */
-  // Next's own options make `dev` optional; requiring it here keeps the
-  // mode an explicit, declared choice at every construction site.
-  static readonly layer = (options: NextOptions & { readonly dev: boolean }) =>
+  // `NextAppConfig` requires `dev`; making it explicit at every
+  // construction site keeps the mode a declared choice.
+  static readonly layer = (options: NextOptions) =>
     Layer.effect(
       NextJs,
       Effect.gen(function* () {
-        const next: NextServer = (Next as unknown as NextFactory)(options);
+        // The one cast: `NextAppConfig.conf` is partial, Next's own type
+        // demands the completed config it fills in at load time.
+        const next: NextServer = createNext(options);
         yield* Effect.addFinalizer(() =>
           Effect.tryPromise({ try: () => next.close(), catch: () => undefined }).pipe(
             Effect.ignore,

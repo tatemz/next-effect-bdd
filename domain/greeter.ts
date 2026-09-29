@@ -1,21 +1,6 @@
-import { Context, Effect, Layer, Match, Schema } from "effect";
+import { Context, Effect, Layer, Match } from "effect";
+import { Language } from "../server/config.ts";
 import { Incrementer } from "./incrementer.ts";
-
-/**
- * The closed set of languages the Greeter speaks.
- *
- * A `Schema.Literals` union, so any other string fails decoding, and adding
- * a language without a case in `Greeter.layerFor` is a type error: the set
- * and its implementations cannot drift apart.
- *
- * @example
- * import { Language } from "./greeter.ts";
- *
- * Language.decodeUnknownSync("en"); // "en"
- * // Language.decodeUnknownSync("fr"); // throws: expected "en" | "es"
- */
-export const Language = Schema.Literals(["en", "es"]);
-export type Language = typeof Language.Type;
 
 /**
  * Greets a visitor in one language, counting the greetings.
@@ -76,7 +61,7 @@ export class Greeter extends Context.Service<
   /**
    * The English `Greeter`, greeting with "Hello!".
    *
-   * The implementation `Greeter.layerFor("en")` returns; it still requires
+   * The implementation `Greeter.layerFor(Language.English)` returns; it still requires
    * an `Incrementer`, which the composition root provides with
    * `Incrementer.greetingCountLayer`.
    *
@@ -98,7 +83,7 @@ export class Greeter extends Context.Service<
   /**
    * The Spanish `Greeter`, greeting with "¡Hola!".
    *
-   * The implementation `Greeter.layerFor("es")` returns; it still requires
+   * The implementation `Greeter.layerFor(Language.Spanish)` returns; it still requires
    * an `Incrementer`, which the composition root provides with
    * `Incrementer.greetingCountLayer`.
    *
@@ -118,21 +103,22 @@ export class Greeter extends Context.Service<
   static readonly layerSpanish = Greeter.layerGreeting("¡Hola!");
 
   /**
-   * Total mapping from the `Language` union to an implementation layer.
+   * Total mapping from the `Language` enum to an implementation layer.
    *
-   * Matched exhaustively over `Language`, so adding a language literal is a
+   * Matched exhaustively over `Language`, so adding an enum member is a
    * compile error until a layer exists for it. The returned layer still
    * requires an `Incrementer`.
    *
    * @example
    * import { Greeter } from "./greeter.ts";
+   * import { Language } from "../server/config.ts";
    *
-   * const spanish = Greeter.layerFor("es"); // Layer.Layer<Greeter, never, Incrementer>
+   * const spanish = Greeter.layerFor(Language.Spanish); // Layer.Layer<Greeter, never, Incrementer>
    */
   static layerFor(language: Language): Layer.Layer<Greeter, never, Incrementer> {
     return Match.value(language).pipe(
-      Match.when("en", () => Greeter.layerEnglish),
-      Match.when("es", () => Greeter.layerSpanish),
+      Match.when(Language.English, () => Greeter.layerEnglish),
+      Match.when(Language.Spanish, () => Greeter.layerSpanish),
       Match.exhaustive,
     );
   }

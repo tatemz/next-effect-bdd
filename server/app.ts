@@ -1,7 +1,6 @@
-import { Config, Layer, Match } from "effect";
-import { Language } from "../domain/greeter.ts";
+import { Layer } from "effect";
 import { apiApp } from "./apiApp.ts";
-import { Mode, nextDevelopment, nextProduction } from "./nextApp.ts";
+import { layerDev as nextLayerDev, layerProd as nextLayerProd } from "./nextApp.ts";
 
 /**
  * The combined app: the typed Effect API and the Next.js app sharing one
@@ -19,75 +18,30 @@ import { Mode, nextDevelopment, nextProduction } from "./nextApp.ts";
  * @example
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
- * import { appProduction } from "./app.ts";
+ * import { Language } from "./config.ts";
+ * import { layerProd } from "./app.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appProduction);
+ * const app = HttpRouter.provideRequest(Greeter.layerFor(Language.English))(layerProd);
  * // /health, /docs, and /openapi.json come from the API half; everything
  * // else renders through Next.
  */
-export const appProduction = Layer.mergeAll(apiApp, nextProduction);
+export const layerProd = Layer.mergeAll(apiApp, nextLayerProd);
 
 /**
  * The combined app in development: the API plus the Next app with its HMR
  * upgrade paths and a dev-mode Next server.
  *
+ * `distDir` optionally overrides Next's build directory (see
+ * `server/nextApp.ts`'s `layerDev`).
+ *
  * @example
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
- * import { appDevelopment } from "./app.ts";
+ * import { Language } from "./config.ts";
+ * import { layerDev } from "./app.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appDevelopment);
+ * const app = HttpRouter.provideRequest(Greeter.layerFor(Language.English))(layerDev());
  * // Same routes as production, plus Next's HMR upgrade paths and live reload.
  */
-export const appDevelopment = Layer.mergeAll(apiApp, nextDevelopment);
-
-/**
- * Total mapping from the `Mode` union to a combined composition - the same
- * shape as `Greeter.layerFor` and `nextFor`. `Match.exhaustive` forces a
- * branch for every mode at compile time, and there is no mode in between
- * the two.
- *
- * @example
- * import { Layer } from "effect";
- * import { HttpRouter } from "effect/unstable/http";
- * import { Greeter } from "../domain/greeter.ts";
- * import { Incrementer } from "../domain/incrementer.ts";
- * import { serveApp } from "./pipeline.ts";
- * import { appFor } from "./app.ts";
- *
- * const greeter = Layer.provideMerge(
- *   Greeter.layerFor("en"),
- *   Incrementer.greetingCountLayer,
- * );
- * const app = HttpRouter.provideRequest(greeter)(appFor("production"));
- * Layer.launch(serveApp(3456)(app));
- * // /health, /docs, and /openapi.json come from the API half; everything
- * // else renders through Next.
- */
-export const appFor = (mode: Mode) =>
-  Match.value(mode).pipe(
-    Match.when("production", () => appProduction),
-    Match.when("development", () => appDevelopment),
-    Match.exhaustive,
-  );
-
-/**
- * Required runtime configuration, read from the Config provider.
- *
- * Nothing is defaulted: a missing `PORT`, `LANGUAGE`, or `MODE` fails at
- * startup with a typed `ConfigError`, as do invalid values (`NaN` ports,
- * misspelled languages, and modes outside the union are unrepresentable).
- * `pnpm start` therefore needs all three set.
- *
- * @example
- * import { Effect } from "effect";
- * import { AppConfig } from "./app.ts";
- *
- * // With PORT=3456 LANGUAGE=en MODE=production in the environment:
- * Effect.runSync(AppConfig); // { mode: "production", language: "en", port: 3456 }
- */
-export const AppConfig = Config.all({
-  mode: Config.schema(Mode, "MODE"),
-  language: Config.schema(Language, "LANGUAGE"),
-  port: Config.Port("PORT"),
-});
+export const layerDev = (distDir?: string) =>
+  Layer.mergeAll(apiApp, nextLayerDev(distDir));

@@ -1,6 +1,5 @@
-import { Config, Layer, Schema } from "effect";
+import { Layer } from "effect";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
-import { Language } from "../domain/greeter.ts";
 import { Api, HealthHandlers } from "./api.ts";
 
 /**
@@ -17,10 +16,13 @@ import { Api, HealthHandlers } from "./api.ts";
  * import { Layer } from "effect";
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
+ * import { Language } from "./config.ts";
  * import { serveApp } from "./pipeline.ts";
  * import { apiApp } from "./apiApp.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(apiApp);
+ * const app = HttpRouter.provideRequest(
+ *   Greeter.layerFor(Language.English),
+ * )(apiApp);
  * Layer.launch(serveApp(3457)(app));
  * // http://localhost:3457/docs serves the Swagger UI; no Next server boots.
  */
@@ -30,20 +32,3 @@ export const apiApp = Layer.mergeAll(
   ),
   HttpApiSwagger.layer(Api, { path: "/docs" }),
 );
-
-/**
- * Required runtime configuration of the standalone API app: the greeter to
- * greet with and the port to serve on. Like the full `AppConfig`, nothing is
- * defaulted; the API app has no mode because it has no variants.
- *
- * @example
- * import { Effect } from "effect";
- * import { ApiAppConfig } from "./apiApp.ts";
- *
- * // With PORT=3457 LANGUAGE=es in the environment:
- * Effect.runSync(ApiAppConfig); // { language: "es", port: 3457 }
- */
-export const ApiAppConfig = Config.all({
-  language: Config.schema(Language, "LANGUAGE"),
-  port: Config.Port("PORT"),
-});

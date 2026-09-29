@@ -15,10 +15,10 @@ import { createServer } from "node:http";
  * @example
  * import { Layer } from "effect";
  * import { apiApp } from "./apiApp.ts";
- * import { nextProduction } from "./nextApp.ts";
+ * import { layerProd } from "./nextApp.ts";
  * import type { EffectApp } from "./pipeline.ts";
  *
- * const app: EffectApp = Layer.mergeAll(apiApp, nextProduction);
+ * const app: EffectApp = Layer.mergeAll(apiApp, layerProd);
  */
 export type EffectApp<E = never, R = never> = Layer.Layer<
   never,
@@ -37,10 +37,13 @@ export type EffectApp<E = never, R = never> = Layer.Layer<
  * import { Layer } from "effect";
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
- * import { appProduction } from "./app.ts";
+ * import { Language } from "./config.ts";
+ * import { layerProd } from "./app.ts";
  * import { serveApp } from "./pipeline.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appProduction);
+ * const app = HttpRouter.provideRequest(
+ *   Greeter.layerFor(Language.English),
+ * )(layerProd);
  * Layer.launch(serveApp(3456)(app));
  */
 export const serveApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
@@ -60,10 +63,13 @@ export const serveApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>
  * import { Effect } from "effect";
  * import { HttpRouter } from "effect/unstable/http";
  * import { Greeter } from "../domain/greeter.ts";
- * import { appProduction } from "./app.ts";
+ * import { Language } from "./config.ts";
+ * import { layerProd } from "./app.ts";
  * import { startApp } from "./pipeline.ts";
  *
- * const app = HttpRouter.provideRequest(Greeter.layerFor("en"))(appProduction);
+ * const app = HttpRouter.provideRequest(
+ *   Greeter.layerFor(Language.English),
+ * )(layerProd);
  * const port = yield* Effect.scoped(startApp(0)(app)); // e.g. 54321
  */
 export const startApp = (port: number) => <E, R>(self: EffectApp<E, R>) =>

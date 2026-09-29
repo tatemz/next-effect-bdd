@@ -1,18 +1,19 @@
 import { NodeRuntime } from "@effect/platform-node";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Match } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import { Greeter } from "./domain/greeter.ts";
 import { Incrementer } from "./domain/incrementer.ts";
-import { AppConfig, appFor } from "./server/app.ts";
+import { layerDev, layerProd } from "./server/app.ts";
+import { AppConfig, Mode } from "./server/config.ts";
 import { serveApp } from "./server/pipeline.ts";
 
 /**
  * The default entry point: the Next app and the Effect HTTP API on one
  * router.
  *
- * Reads `AppConfig` from the environment, composes `appFor(mode)` with the
- * configured `Greeter` and its `greeting-count` `Incrementer`, then launches
- * the served app until interrupted.
+ * Reads `AppConfig` from the environment, chooses the composition the mode
+ * names, provides the configured `Greeter` and its `greeting-count`
+ * `Incrementer`, then launches the served app until interrupted.
  *
  * @example
  * // Build first (next build), then serve on the configured port:
@@ -27,6 +28,13 @@ if (import.meta.main) {
   const AppLayer = Layer.unwrap(
     Effect.gen(function* () {
       const { mode, language, port } = yield* AppConfig;
+      // The entry point is where MODE becomes a choice, made exhaustively:
+      // a new mode without a branch here is a compile error.
+      const app = Match.value(mode).pipe(
+        Match.when(Mode.Production, () => layerProd),
+        Match.when(Mode.Development, () => layerDev()),
+        Match.exhaustive,
+      );
       // This is the composition root, so it owns the wiring the domain
       // leaves open: the greeter's "greeting-count" Incrementer.
       // provideMerge keeps the counter in the request context too, so page
@@ -35,7 +43,7 @@ if (import.meta.main) {
         Greeter.layerFor(language),
         Incrementer.greetingCountLayer,
       );
-      const appWithGreeter = HttpRouter.provideRequest(greeter)(appFor(mode));
+      const appWithGreeter = HttpRouter.provideRequest(greeter)(app);
       return serveApp(port)(appWithGreeter);
     }),
   );

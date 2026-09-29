@@ -9,8 +9,8 @@ one router, one runtime, one request context? The answer demonstrated here is
 yes:
 
 ```ts
-const port = yield* appFor("production")
-  .pipe(HttpRouter.provideRequest(Greeter.layerFor("es")), startApp(port));
+const port = yield* layerProd
+  .pipe(HttpRouter.provideRequest(Greeter.layerFor(Language.Spanish)), startApp(0));
 ```
 
 ```mermaid
@@ -21,8 +21,8 @@ sequenceDiagram
     participant N as Next catch-all
 
     Note over R: main.api.ts: apiApp only
-    Note over R: main.next.ts: nextFor(mode) only
-    Note over R: main.ts: mergeAll(apiApp, nextFor(mode))
+    Note over R: main.next.ts: the Next half only
+    Note over R: main.ts: mergeAll(apiApp, the Next half)
 
     C->>R: GET /health, /docs
     R->>A: matched
@@ -43,9 +43,11 @@ sequenceDiagram
 - **One contract, three consumers.** Handlers, OpenAPI/Swagger, and the BDD
   test client all derive from the same schema-first `HttpApi`
   (`server/api.ts`), so drift is a compile error.
-- **A total mode model.** `appFor(mode)` maps a closed `Mode` union to
-  explicit compositions; adding a mode breaks the switch instead of silently
-  misbehaving.
+- **A total mode model.** The environment's `MODE` becomes a composition
+  choice at each entry point, made exhaustively over the `Mode` enum:
+  a new mode without a branch is a compile error, and programmatic callers
+  pick `layerProd`/`layerDev` (or their own `layer(config, routes)`)
+  directly.
 
 There are three entry points: `main.next.ts` (Next only), `main.api.ts`
 (Effect API only), and the default `main.ts`, which composes both halves on
@@ -56,16 +58,17 @@ one router with `Layer.mergeAll`.
 Dependencies point one way: `app/` and `features/` → `server/` → `domain/`.
 
 ```text
-domain/greeter.ts      Greeter service, the Language union, Greeter.layerFor
+domain/greeter.ts      Greeter service and its layerFor mapping
+server/config.ts       single source of truth: Mode/Language enums + schemas, AppConfig
 server/api.ts          the typed Api contract: HttpApi + handlers + client type
 server/apiApp.ts       standalone API app: Api routes + Swagger UI + config
-server/nextApp.ts      standalone Next app: Mode union, nextFor, config, HMR routes
+server/nextApp.ts      standalone Next app: layer(config, routes), layerProd, layerDev, HMR routes
 server/deps.ts         AsyncLocalStorage bridge from request fibers into renders
 server/next.ts         NextJs service and the nextCatchAll route
 server/pipeline.ts     serveApp / startApp (HttpRouter.serve over NodeHttpServer)
-server/app.ts          the composed app: mergeAll(apiApp, nextFor(mode))
+server/app.ts          the composed app: mergeAll(apiApp, the Next half)
 app/page.tsx           Next server component; runs Greeter against the request context
-features/              Gherkin features + steps (effect-bdd, Playwright)
+features/              Gherkin features + steps + the programmatic runner
 ```
 
 ## Features
@@ -77,16 +80,10 @@ one narrow claim: the Next-rendered page greets per language, the typed
 A Playwright scenario proves the shared context: page view, health hit, and
 server action all read the *same* `Incrementer` instance.
 
-Every scenario runs in **both Next modes**, driven by a `mode` column in the
-Gherkin Examples tables (`Given a POC app in <mode> mode`): `production`
-serves the built `.next` output, `development` boots Next with on-demand
-compilation. Two Next 16 realities shape how the suite is launched (both
-verified against `next@16.3.6`): turbopack's compile registry is
-process-global, so a process hosts many prod servers but only the **first**
-dev one; and a booted dev Next leaks handles, so its process never exits on
-its own. Hence `pnpm test-bdd` runs one shared-process `@prod` lane, then
-one fresh-process example per `@dev` row — which is exactly why prod is the
-fast lane and dev the slow one.
+Every scenario runs against the **production lane**: the `production`
+mode serves the built `.next` output, booted and released in-process per
+scenario. (The app itself still ships a development lane — `layerDev` and
+the `pnpm dev` scripts — but the BDD runner exercises only production.)
 
 ## Commands
 
@@ -97,17 +94,12 @@ pnpm build          # next build (required before start/tests)
 pnpm dev            # composed app, with HMR; :next / :api run the variants
 pnpm start          # production; start:next / start:api for the variants
 
-pnpm test-bdd       # both lanes: @prod examples (one process, fast), then
-                    # each @dev example in its own process (scripts/run-dev-
-                    # bdd.sh; slow by design). pretest-bdd builds first.
+pnpm test-bdd       # the whole feature, in one process: builds first
+                    # (pretest-bdd), then runs the step module, which
+                    # *is* the runner (effect-bdd programmatically, no CLI).
                     # Run once beforehand:
                     #   pnpm exec playwright install chromium
 ```
-
-The dev lane writes to `.next-dev/` (never `.next`, so it cannot clobber the
-production build) and restores the two files Next's dev typegen rewrites
-(`next-env.d.ts`, `tsconfig.json`). `pnpm test-bdd:prod` / `pnpm test-bdd:dev`
-run a single lane.
 
 `dev` scripts carry their own env; `start` respects `PORT`, `LANGUAGE`, and
 `MODE` from the environment (the API variant needs only `PORT` and
